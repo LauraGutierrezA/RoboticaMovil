@@ -1,0 +1,1633 @@
+<?xml version="1.0"?>
+<sdf version="1.9">
+  <world name="pista_pro">
+    <physics name="1ms" type="ignored">
+      <max_step_size>0.001</max_step_size>
+      <real_time_factor>1.0</real_time_factor>
+    </physics>
+    <plugin filename="gz-sim-physics-system" name="gz::sim::systems::Physics"/>
+    <plugin filename="gz-sim-scene-broadcaster-system" name="gz::sim::systems::SceneBroadcaster"/>
+    <plugin filename="gz-sim-sensors-system" name="gz::sim::systems::Sensors">
+      <render_engine>ogre2</render_engine>
+    </plugin>
+    <plugin filename="gz-sim-user-commands-system" name="gz::sim::systems::UserCommands"/>
+
+    <light type="directional" name="sol">
+      <pose>0 0 10 0 0 0</pose>
+      <direction>0.3 0.3 -1</direction>
+    </light>
+
+    <model name="piso">
+      <static>true</static>
+      <link name="link">
+        <collision name="col">
+          <geometry><plane><normal>0 0 1</normal><size>20 20</size></plane></geometry>
+        </collision>
+        <visual name="vis">
+          <geometry><plane><normal>0 0 1</normal><size>20 20</size></plane></geometry>
+          <material><ambient>0.5 0.5 0.5 1</ambient><diffuse>0.5 0.5 0.5 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+
+    <!-- ===== Pista en 8 con puente: generada con generar_pista_pro.py =====
+         R=2.5 m, carril=1.2 m, estrechamiento=0.7 m
+         Puente: altura 0.3 m, pendiente 9.5 grados, libre debajo 0.26 m
+         Spawn: x=-1.06 y=1.06 yaw=-0.785 (recta B, mirando hacia el cruce) -->
+
+    <model name="der_ext_00">
+      <static>true</static>
+      <pose>1.5505 -2.3657 0.2500 0 0.0000 -0.6981</pose>
+      <link name="link">
+        <collision name="col"><geometry><box><size>0.6404 0.1000 0.5000</size></box></geometry></collision>
+        <visual name="vis">
+          <geometry><box><size>0.6404 0.1000 0.5000</size></box></geometry>
+          <material><ambient>0.87 0.72 0.53 1</ambient><diffuse>0.87 0.72 0.53 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+    <model name="der_ext_01">
+      <static>true</static>
+      <pose>1.9914 -2.6745 0.2500 0 0.0000 -0.5236</pose>
+      <link name="link">
+        <collision name="col"><geometry><box><size>0.6404 0.1000 0.5000</size></box></geometry></collision>
+        <visual name="vis">
+          <geometry><box><size>0.6404 0.1000 0.5000</size></box></geometry>
+          <material><ambient>0.87 0.72 0.53 1</ambient><diffuse>0.87 0.72 0.53 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+    <model name="der_ext_02">
+      <static>true</static>
+      <pose>2.4793 -2.9020 0.2500 0 0.0000 -0.3491</pose>
+      <link name="link">
+        <collision name="col"><geometry><box><size>0.6404 0.1000 0.5000</size></box></geometry></collision>
+        <visual name="vis">
+          <geometry><box><size>0.6404 0.1000 0.5000</size></box></geometry>
+          <material><ambient>0.87 0.72 0.53 1</ambient><diffuse>0.87 0.72 0.53 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+    <model name="der_ext_03">
+      <static>true</static>
+      <pose>2.9993 -3.0413 0.2500 0 0.0000 -0.1745</pose>
+      <link name="link">
+        <collision name="col"><geometry><box><size>0.6404 0.1000 0.5000</size></box></geometry></collision>
+        <visual name="vis">
+          <geometry><box><size>0.6404 0.1000 0.5000</size></box></geometry>
+          <material><ambient>0.87 0.72 0.53 1</ambient><diffuse>0.87 0.72 0.53 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+    <model name="der_ext_04">
+      <static>true</static>
+      <pose>3.5355 -3.0882 0.2500 0 0.0000 0.0000</pose>
+      <link name="link">
+        <collision name="col"><geometry><box><size>0.6404 0.1000 0.5000</size></box></geometry></collision>
+        <visual name="vis">
+          <geometry><box><size>0.6404 0.1000 0.5000</size></box></geometry>
+          <material><ambient>0.87 0.72 0.53 1</ambient><diffuse>0.87 0.72 0.53 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+    <model name="der_ext_05">
+      <static>true</static>
+      <pose>4.0718 -3.0413 0.2500 0 0.0000 0.1745</pose>
+      <link name="link">
+        <collision name="col"><geometry><box><size>0.6404 0.1000 0.5000</size></box></geometry></collision>
+        <visual name="vis">
+          <geometry><box><size>0.6404 0.1000 0.5000</size></box></geometry>
+          <material><ambient>0.87 0.72 0.53 1</ambient><diffuse>0.87 0.72 0.53 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+    <model name="der_ext_06">
+      <static>true</static>
+      <pose>4.5918 -2.9020 0.2500 0 0.0000 0.3491</pose>
+      <link name="link">
+        <collision name="col"><geometry><box><size>0.6404 0.1000 0.5000</size></box></geometry></collision>
+        <visual name="vis">
+          <geometry><box><size>0.6404 0.1000 0.5000</size></box></geometry>
+          <material><ambient>0.87 0.72 0.53 1</ambient><diffuse>0.87 0.72 0.53 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+    <model name="der_ext_07">
+      <static>true</static>
+      <pose>5.0796 -2.6745 0.2500 0 0.0000 0.5236</pose>
+      <link name="link">
+        <collision name="col"><geometry><box><size>0.6404 0.1000 0.5000</size></box></geometry></collision>
+        <visual name="vis">
+          <geometry><box><size>0.6404 0.1000 0.5000</size></box></geometry>
+          <material><ambient>0.87 0.72 0.53 1</ambient><diffuse>0.87 0.72 0.53 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+    <model name="der_ext_08">
+      <static>true</static>
+      <pose>5.5206 -2.3657 0.2500 0 0.0000 0.6981</pose>
+      <link name="link">
+        <collision name="col"><geometry><box><size>0.6404 0.1000 0.5000</size></box></geometry></collision>
+        <visual name="vis">
+          <geometry><box><size>0.6404 0.1000 0.5000</size></box></geometry>
+          <material><ambient>0.87 0.72 0.53 1</ambient><diffuse>0.87 0.72 0.53 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+    <model name="der_ext_09">
+      <static>true</static>
+      <pose>5.9012 -1.9851 0.2500 0 0.0000 0.8727</pose>
+      <link name="link">
+        <collision name="col"><geometry><box><size>0.6404 0.1000 0.5000</size></box></geometry></collision>
+        <visual name="vis">
+          <geometry><box><size>0.6404 0.1000 0.5000</size></box></geometry>
+          <material><ambient>0.87 0.72 0.53 1</ambient><diffuse>0.87 0.72 0.53 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+    <model name="der_ext_10">
+      <static>true</static>
+      <pose>6.2100 -1.5441 0.2500 0 0.0000 1.0472</pose>
+      <link name="link">
+        <collision name="col"><geometry><box><size>0.6404 0.1000 0.5000</size></box></geometry></collision>
+        <visual name="vis">
+          <geometry><box><size>0.6404 0.1000 0.5000</size></box></geometry>
+          <material><ambient>0.87 0.72 0.53 1</ambient><diffuse>0.87 0.72 0.53 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+    <model name="der_ext_11">
+      <static>true</static>
+      <pose>6.4375 -1.0562 0.2500 0 0.0000 1.2217</pose>
+      <link name="link">
+        <collision name="col"><geometry><box><size>0.6404 0.1000 0.5000</size></box></geometry></collision>
+        <visual name="vis">
+          <geometry><box><size>0.6404 0.1000 0.5000</size></box></geometry>
+          <material><ambient>0.87 0.72 0.53 1</ambient><diffuse>0.87 0.72 0.53 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+    <model name="der_ext_12">
+      <static>true</static>
+      <pose>6.5768 -0.5363 0.2500 0 0.0000 1.3963</pose>
+      <link name="link">
+        <collision name="col"><geometry><box><size>0.6404 0.1000 0.5000</size></box></geometry></collision>
+        <visual name="vis">
+          <geometry><box><size>0.6404 0.1000 0.5000</size></box></geometry>
+          <material><ambient>0.87 0.72 0.53 1</ambient><diffuse>0.87 0.72 0.53 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+    <model name="der_ext_13">
+      <static>true</static>
+      <pose>6.6237 0.0000 0.2500 0 0.0000 1.5708</pose>
+      <link name="link">
+        <collision name="col"><geometry><box><size>0.6404 0.1000 0.5000</size></box></geometry></collision>
+        <visual name="vis">
+          <geometry><box><size>0.6404 0.1000 0.5000</size></box></geometry>
+          <material><ambient>0.87 0.72 0.53 1</ambient><diffuse>0.87 0.72 0.53 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+    <model name="der_ext_14">
+      <static>true</static>
+      <pose>6.5768 0.5363 0.2500 0 0.0000 1.7453</pose>
+      <link name="link">
+        <collision name="col"><geometry><box><size>0.6404 0.1000 0.5000</size></box></geometry></collision>
+        <visual name="vis">
+          <geometry><box><size>0.6404 0.1000 0.5000</size></box></geometry>
+          <material><ambient>0.87 0.72 0.53 1</ambient><diffuse>0.87 0.72 0.53 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+    <model name="der_ext_15">
+      <static>true</static>
+      <pose>6.4375 1.0562 0.2500 0 0.0000 1.9199</pose>
+      <link name="link">
+        <collision name="col"><geometry><box><size>0.6404 0.1000 0.5000</size></box></geometry></collision>
+        <visual name="vis">
+          <geometry><box><size>0.6404 0.1000 0.5000</size></box></geometry>
+          <material><ambient>0.87 0.72 0.53 1</ambient><diffuse>0.87 0.72 0.53 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+    <model name="der_ext_16">
+      <static>true</static>
+      <pose>6.2100 1.5441 0.2500 0 0.0000 2.0944</pose>
+      <link name="link">
+        <collision name="col"><geometry><box><size>0.6404 0.1000 0.5000</size></box></geometry></collision>
+        <visual name="vis">
+          <geometry><box><size>0.6404 0.1000 0.5000</size></box></geometry>
+          <material><ambient>0.87 0.72 0.53 1</ambient><diffuse>0.87 0.72 0.53 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+    <model name="der_ext_17">
+      <static>true</static>
+      <pose>5.9012 1.9851 0.2500 0 0.0000 2.2689</pose>
+      <link name="link">
+        <collision name="col"><geometry><box><size>0.6404 0.1000 0.5000</size></box></geometry></collision>
+        <visual name="vis">
+          <geometry><box><size>0.6404 0.1000 0.5000</size></box></geometry>
+          <material><ambient>0.87 0.72 0.53 1</ambient><diffuse>0.87 0.72 0.53 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+    <model name="der_ext_18">
+      <static>true</static>
+      <pose>5.5206 2.3657 0.2500 0 0.0000 2.4435</pose>
+      <link name="link">
+        <collision name="col"><geometry><box><size>0.6404 0.1000 0.5000</size></box></geometry></collision>
+        <visual name="vis">
+          <geometry><box><size>0.6404 0.1000 0.5000</size></box></geometry>
+          <material><ambient>0.87 0.72 0.53 1</ambient><diffuse>0.87 0.72 0.53 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+    <model name="der_ext_19">
+      <static>true</static>
+      <pose>5.0796 2.6745 0.2500 0 0.0000 2.6180</pose>
+      <link name="link">
+        <collision name="col"><geometry><box><size>0.6404 0.1000 0.5000</size></box></geometry></collision>
+        <visual name="vis">
+          <geometry><box><size>0.6404 0.1000 0.5000</size></box></geometry>
+          <material><ambient>0.87 0.72 0.53 1</ambient><diffuse>0.87 0.72 0.53 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+    <model name="der_ext_20">
+      <static>true</static>
+      <pose>4.5918 2.9020 0.2500 0 0.0000 2.7925</pose>
+      <link name="link">
+        <collision name="col"><geometry><box><size>0.6404 0.1000 0.5000</size></box></geometry></collision>
+        <visual name="vis">
+          <geometry><box><size>0.6404 0.1000 0.5000</size></box></geometry>
+          <material><ambient>0.87 0.72 0.53 1</ambient><diffuse>0.87 0.72 0.53 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+    <model name="der_ext_21">
+      <static>true</static>
+      <pose>4.0718 3.0413 0.2500 0 0.0000 2.9671</pose>
+      <link name="link">
+        <collision name="col"><geometry><box><size>0.6404 0.1000 0.5000</size></box></geometry></collision>
+        <visual name="vis">
+          <geometry><box><size>0.6404 0.1000 0.5000</size></box></geometry>
+          <material><ambient>0.87 0.72 0.53 1</ambient><diffuse>0.87 0.72 0.53 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+    <model name="der_ext_22">
+      <static>true</static>
+      <pose>3.5355 3.0882 0.2500 0 0.0000 3.1416</pose>
+      <link name="link">
+        <collision name="col"><geometry><box><size>0.6404 0.1000 0.5000</size></box></geometry></collision>
+        <visual name="vis">
+          <geometry><box><size>0.6404 0.1000 0.5000</size></box></geometry>
+          <material><ambient>0.87 0.72 0.53 1</ambient><diffuse>0.87 0.72 0.53 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+    <model name="der_ext_23">
+      <static>true</static>
+      <pose>2.9993 3.0413 0.2500 0 0.0000 3.3161</pose>
+      <link name="link">
+        <collision name="col"><geometry><box><size>0.6404 0.1000 0.5000</size></box></geometry></collision>
+        <visual name="vis">
+          <geometry><box><size>0.6404 0.1000 0.5000</size></box></geometry>
+          <material><ambient>0.87 0.72 0.53 1</ambient><diffuse>0.87 0.72 0.53 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+    <model name="der_ext_24">
+      <static>true</static>
+      <pose>2.4793 2.9020 0.2500 0 0.0000 3.4907</pose>
+      <link name="link">
+        <collision name="col"><geometry><box><size>0.6404 0.1000 0.5000</size></box></geometry></collision>
+        <visual name="vis">
+          <geometry><box><size>0.6404 0.1000 0.5000</size></box></geometry>
+          <material><ambient>0.87 0.72 0.53 1</ambient><diffuse>0.87 0.72 0.53 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+    <model name="der_ext_25">
+      <static>true</static>
+      <pose>1.9914 2.6745 0.2500 0 0.0000 3.6652</pose>
+      <link name="link">
+        <collision name="col"><geometry><box><size>0.6404 0.1000 0.5000</size></box></geometry></collision>
+        <visual name="vis">
+          <geometry><box><size>0.6404 0.1000 0.5000</size></box></geometry>
+          <material><ambient>0.87 0.72 0.53 1</ambient><diffuse>0.87 0.72 0.53 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+    <model name="der_ext_26">
+      <static>true</static>
+      <pose>1.5505 2.3657 0.2500 0 0.0000 3.8397</pose>
+      <link name="link">
+        <collision name="col"><geometry><box><size>0.6404 0.1000 0.5000</size></box></geometry></collision>
+        <visual name="vis">
+          <geometry><box><size>0.6404 0.1000 0.5000</size></box></geometry>
+          <material><ambient>0.87 0.72 0.53 1</ambient><diffuse>0.87 0.72 0.53 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+    <model name="der_int_00">
+      <static>true</static>
+      <pose>2.3189 -1.4499 0.2500 0 0.0000 -0.6981</pose>
+      <link name="link">
+        <collision name="col"><geometry><box><size>0.4312 0.1000 0.5000</size></box></geometry></collision>
+        <visual name="vis">
+          <geometry><box><size>0.4312 0.1000 0.5000</size></box></geometry>
+          <material><ambient>0.87 0.72 0.53 1</ambient><diffuse>0.87 0.72 0.53 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+    <model name="der_int_01">
+      <static>true</static>
+      <pose>2.5891 -1.6392 0.2500 0 0.0000 -0.5236</pose>
+      <link name="link">
+        <collision name="col"><geometry><box><size>0.4312 0.1000 0.5000</size></box></geometry></collision>
+        <visual name="vis">
+          <geometry><box><size>0.4312 0.1000 0.5000</size></box></geometry>
+          <material><ambient>0.87 0.72 0.53 1</ambient><diffuse>0.87 0.72 0.53 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+    <model name="der_int_02">
+      <static>true</static>
+      <pose>2.8882 -1.7786 0.2500 0 0.0000 -0.3491</pose>
+      <link name="link">
+        <collision name="col"><geometry><box><size>0.4312 0.1000 0.5000</size></box></geometry></collision>
+        <visual name="vis">
+          <geometry><box><size>0.4312 0.1000 0.5000</size></box></geometry>
+          <material><ambient>0.87 0.72 0.53 1</ambient><diffuse>0.87 0.72 0.53 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+    <model name="der_int_03">
+      <static>true</static>
+      <pose>3.2069 -1.8640 0.2500 0 0.0000 -0.1745</pose>
+      <link name="link">
+        <collision name="col"><geometry><box><size>0.4312 0.1000 0.5000</size></box></geometry></collision>
+        <visual name="vis">
+          <geometry><box><size>0.4312 0.1000 0.5000</size></box></geometry>
+          <material><ambient>0.87 0.72 0.53 1</ambient><diffuse>0.87 0.72 0.53 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+    <model name="der_int_04">
+      <static>true</static>
+      <pose>3.5355 -1.8928 0.2500 0 0.0000 0.0000</pose>
+      <link name="link">
+        <collision name="col"><geometry><box><size>0.4312 0.1000 0.5000</size></box></geometry></collision>
+        <visual name="vis">
+          <geometry><box><size>0.4312 0.1000 0.5000</size></box></geometry>
+          <material><ambient>0.87 0.72 0.53 1</ambient><diffuse>0.87 0.72 0.53 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+    <model name="der_int_05">
+      <static>true</static>
+      <pose>3.8642 -1.8640 0.2500 0 0.0000 0.1745</pose>
+      <link name="link">
+        <collision name="col"><geometry><box><size>0.4312 0.1000 0.5000</size></box></geometry></collision>
+        <visual name="vis">
+          <geometry><box><size>0.4312 0.1000 0.5000</size></box></geometry>
+          <material><ambient>0.87 0.72 0.53 1</ambient><diffuse>0.87 0.72 0.53 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+    <model name="der_int_06">
+      <static>true</static>
+      <pose>4.1829 -1.7786 0.2500 0 0.0000 0.3491</pose>
+      <link name="link">
+        <collision name="col"><geometry><box><size>0.4312 0.1000 0.5000</size></box></geometry></collision>
+        <visual name="vis">
+          <geometry><box><size>0.4312 0.1000 0.5000</size></box></geometry>
+          <material><ambient>0.87 0.72 0.53 1</ambient><diffuse>0.87 0.72 0.53 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+    <model name="der_int_07">
+      <static>true</static>
+      <pose>4.4819 -1.6392 0.2500 0 0.0000 0.5236</pose>
+      <link name="link">
+        <collision name="col"><geometry><box><size>0.4312 0.1000 0.5000</size></box></geometry></collision>
+        <visual name="vis">
+          <geometry><box><size>0.4312 0.1000 0.5000</size></box></geometry>
+          <material><ambient>0.87 0.72 0.53 1</ambient><diffuse>0.87 0.72 0.53 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+    <model name="der_int_08">
+      <static>true</static>
+      <pose>4.7522 -1.4499 0.2500 0 0.0000 0.6981</pose>
+      <link name="link">
+        <collision name="col"><geometry><box><size>0.4312 0.1000 0.5000</size></box></geometry></collision>
+        <visual name="vis">
+          <geometry><box><size>0.4312 0.1000 0.5000</size></box></geometry>
+          <material><ambient>0.87 0.72 0.53 1</ambient><diffuse>0.87 0.72 0.53 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+    <model name="der_int_09">
+      <static>true</static>
+      <pose>4.9855 -1.2166 0.2500 0 0.0000 0.8727</pose>
+      <link name="link">
+        <collision name="col"><geometry><box><size>0.4312 0.1000 0.5000</size></box></geometry></collision>
+        <visual name="vis">
+          <geometry><box><size>0.4312 0.1000 0.5000</size></box></geometry>
+          <material><ambient>0.87 0.72 0.53 1</ambient><diffuse>0.87 0.72 0.53 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+    <model name="der_int_10">
+      <static>true</static>
+      <pose>5.1747 -0.9464 0.2500 0 0.0000 1.0472</pose>
+      <link name="link">
+        <collision name="col"><geometry><box><size>0.4312 0.1000 0.5000</size></box></geometry></collision>
+        <visual name="vis">
+          <geometry><box><size>0.4312 0.1000 0.5000</size></box></geometry>
+          <material><ambient>0.87 0.72 0.53 1</ambient><diffuse>0.87 0.72 0.53 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+    <model name="der_int_11">
+      <static>true</static>
+      <pose>5.3142 -0.6474 0.2500 0 0.0000 1.2217</pose>
+      <link name="link">
+        <collision name="col"><geometry><box><size>0.4312 0.1000 0.5000</size></box></geometry></collision>
+        <visual name="vis">
+          <geometry><box><size>0.4312 0.1000 0.5000</size></box></geometry>
+          <material><ambient>0.87 0.72 0.53 1</ambient><diffuse>0.87 0.72 0.53 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+    <model name="der_int_12">
+      <static>true</static>
+      <pose>5.3995 -0.3287 0.2500 0 0.0000 1.3963</pose>
+      <link name="link">
+        <collision name="col"><geometry><box><size>0.4312 0.1000 0.5000</size></box></geometry></collision>
+        <visual name="vis">
+          <geometry><box><size>0.4312 0.1000 0.5000</size></box></geometry>
+          <material><ambient>0.87 0.72 0.53 1</ambient><diffuse>0.87 0.72 0.53 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+    <model name="der_int_13">
+      <static>true</static>
+      <pose>5.4283 0.0000 0.2500 0 0.0000 1.5708</pose>
+      <link name="link">
+        <collision name="col"><geometry><box><size>0.4312 0.1000 0.5000</size></box></geometry></collision>
+        <visual name="vis">
+          <geometry><box><size>0.4312 0.1000 0.5000</size></box></geometry>
+          <material><ambient>0.87 0.72 0.53 1</ambient><diffuse>0.87 0.72 0.53 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+    <model name="der_int_14">
+      <static>true</static>
+      <pose>5.3995 0.3287 0.2500 0 0.0000 1.7453</pose>
+      <link name="link">
+        <collision name="col"><geometry><box><size>0.4312 0.1000 0.5000</size></box></geometry></collision>
+        <visual name="vis">
+          <geometry><box><size>0.4312 0.1000 0.5000</size></box></geometry>
+          <material><ambient>0.87 0.72 0.53 1</ambient><diffuse>0.87 0.72 0.53 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+    <model name="der_int_15">
+      <static>true</static>
+      <pose>5.3142 0.6474 0.2500 0 0.0000 1.9199</pose>
+      <link name="link">
+        <collision name="col"><geometry><box><size>0.4312 0.1000 0.5000</size></box></geometry></collision>
+        <visual name="vis">
+          <geometry><box><size>0.4312 0.1000 0.5000</size></box></geometry>
+          <material><ambient>0.87 0.72 0.53 1</ambient><diffuse>0.87 0.72 0.53 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+    <model name="der_int_16">
+      <static>true</static>
+      <pose>5.1747 0.9464 0.2500 0 0.0000 2.0944</pose>
+      <link name="link">
+        <collision name="col"><geometry><box><size>0.4312 0.1000 0.5000</size></box></geometry></collision>
+        <visual name="vis">
+          <geometry><box><size>0.4312 0.1000 0.5000</size></box></geometry>
+          <material><ambient>0.87 0.72 0.53 1</ambient><diffuse>0.87 0.72 0.53 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+    <model name="der_int_17">
+      <static>true</static>
+      <pose>4.9855 1.2166 0.2500 0 0.0000 2.2689</pose>
+      <link name="link">
+        <collision name="col"><geometry><box><size>0.4312 0.1000 0.5000</size></box></geometry></collision>
+        <visual name="vis">
+          <geometry><box><size>0.4312 0.1000 0.5000</size></box></geometry>
+          <material><ambient>0.87 0.72 0.53 1</ambient><diffuse>0.87 0.72 0.53 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+    <model name="der_int_18">
+      <static>true</static>
+      <pose>4.7522 1.4499 0.2500 0 0.0000 2.4435</pose>
+      <link name="link">
+        <collision name="col"><geometry><box><size>0.4312 0.1000 0.5000</size></box></geometry></collision>
+        <visual name="vis">
+          <geometry><box><size>0.4312 0.1000 0.5000</size></box></geometry>
+          <material><ambient>0.87 0.72 0.53 1</ambient><diffuse>0.87 0.72 0.53 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+    <model name="der_int_19">
+      <static>true</static>
+      <pose>4.4819 1.6392 0.2500 0 0.0000 2.6180</pose>
+      <link name="link">
+        <collision name="col"><geometry><box><size>0.4312 0.1000 0.5000</size></box></geometry></collision>
+        <visual name="vis">
+          <geometry><box><size>0.4312 0.1000 0.5000</size></box></geometry>
+          <material><ambient>0.87 0.72 0.53 1</ambient><diffuse>0.87 0.72 0.53 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+    <model name="der_int_20">
+      <static>true</static>
+      <pose>4.1829 1.7786 0.2500 0 0.0000 2.7925</pose>
+      <link name="link">
+        <collision name="col"><geometry><box><size>0.4312 0.1000 0.5000</size></box></geometry></collision>
+        <visual name="vis">
+          <geometry><box><size>0.4312 0.1000 0.5000</size></box></geometry>
+          <material><ambient>0.87 0.72 0.53 1</ambient><diffuse>0.87 0.72 0.53 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+    <model name="der_int_21">
+      <static>true</static>
+      <pose>3.8642 1.8640 0.2500 0 0.0000 2.9671</pose>
+      <link name="link">
+        <collision name="col"><geometry><box><size>0.4312 0.1000 0.5000</size></box></geometry></collision>
+        <visual name="vis">
+          <geometry><box><size>0.4312 0.1000 0.5000</size></box></geometry>
+          <material><ambient>0.87 0.72 0.53 1</ambient><diffuse>0.87 0.72 0.53 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+    <model name="der_int_22">
+      <static>true</static>
+      <pose>3.5355 1.8928 0.2500 0 0.0000 3.1416</pose>
+      <link name="link">
+        <collision name="col"><geometry><box><size>0.4312 0.1000 0.5000</size></box></geometry></collision>
+        <visual name="vis">
+          <geometry><box><size>0.4312 0.1000 0.5000</size></box></geometry>
+          <material><ambient>0.87 0.72 0.53 1</ambient><diffuse>0.87 0.72 0.53 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+    <model name="der_int_23">
+      <static>true</static>
+      <pose>3.2069 1.8640 0.2500 0 0.0000 3.3161</pose>
+      <link name="link">
+        <collision name="col"><geometry><box><size>0.4312 0.1000 0.5000</size></box></geometry></collision>
+        <visual name="vis">
+          <geometry><box><size>0.4312 0.1000 0.5000</size></box></geometry>
+          <material><ambient>0.87 0.72 0.53 1</ambient><diffuse>0.87 0.72 0.53 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+    <model name="der_int_24">
+      <static>true</static>
+      <pose>2.8882 1.7786 0.2500 0 0.0000 3.4907</pose>
+      <link name="link">
+        <collision name="col"><geometry><box><size>0.4312 0.1000 0.5000</size></box></geometry></collision>
+        <visual name="vis">
+          <geometry><box><size>0.4312 0.1000 0.5000</size></box></geometry>
+          <material><ambient>0.87 0.72 0.53 1</ambient><diffuse>0.87 0.72 0.53 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+    <model name="der_int_25">
+      <static>true</static>
+      <pose>2.5891 1.6392 0.2500 0 0.0000 3.6652</pose>
+      <link name="link">
+        <collision name="col"><geometry><box><size>0.4312 0.1000 0.5000</size></box></geometry></collision>
+        <visual name="vis">
+          <geometry><box><size>0.4312 0.1000 0.5000</size></box></geometry>
+          <material><ambient>0.87 0.72 0.53 1</ambient><diffuse>0.87 0.72 0.53 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+    <model name="der_int_26">
+      <static>true</static>
+      <pose>2.3189 1.4499 0.2500 0 0.0000 3.8397</pose>
+      <link name="link">
+        <collision name="col"><geometry><box><size>0.4312 0.1000 0.5000</size></box></geometry></collision>
+        <visual name="vis">
+          <geometry><box><size>0.4312 0.1000 0.5000</size></box></geometry>
+          <material><ambient>0.87 0.72 0.53 1</ambient><diffuse>0.87 0.72 0.53 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+    <model name="izq_ext_a_00">
+      <static>true</static>
+      <pose>-1.5413 2.3592 0.2500 0 0.0000 2.4398</pose>
+      <link name="link">
+        <collision name="col"><geometry><box><size>0.6179 0.1000 0.5000</size></box></geometry></collision>
+        <visual name="vis">
+          <geometry><box><size>0.6179 0.1000 0.5000</size></box></geometry>
+          <material><ambient>0.87 0.72 0.53 1</ambient><diffuse>0.87 0.72 0.53 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+    <model name="izq_ext_a_01">
+      <static>true</static>
+      <pose>-1.9619 2.6583 0.2500 0 0.0000 2.6071</pose>
+      <link name="link">
+        <collision name="col"><geometry><box><size>0.6179 0.1000 0.5000</size></box></geometry></collision>
+        <visual name="vis">
+          <geometry><box><size>0.6179 0.1000 0.5000</size></box></geometry>
+          <material><ambient>0.87 0.72 0.53 1</ambient><diffuse>0.87 0.72 0.53 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+    <model name="izq_ext_a_02">
+      <static>true</static>
+      <pose>-2.4264 2.8832 0.2500 0 0.0000 2.7743</pose>
+      <link name="link">
+        <collision name="col"><geometry><box><size>0.6179 0.1000 0.5000</size></box></geometry></collision>
+        <visual name="vis">
+          <geometry><box><size>0.6179 0.1000 0.5000</size></box></geometry>
+          <material><ambient>0.87 0.72 0.53 1</ambient><diffuse>0.87 0.72 0.53 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+    <model name="izq_ext_a_03">
+      <static>true</static>
+      <pose>-2.9219 3.0276 0.2500 0 0.0000 2.9416</pose>
+      <link name="link">
+        <collision name="col"><geometry><box><size>0.6179 0.1000 0.5000</size></box></geometry></collision>
+        <visual name="vis">
+          <geometry><box><size>0.6179 0.1000 0.5000</size></box></geometry>
+          <material><ambient>0.87 0.72 0.53 1</ambient><diffuse>0.87 0.72 0.53 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+    <model name="izq_ext_a_04">
+      <static>true</static>
+      <pose>-3.4345 3.0875 0.2500 0 0.0000 3.1089</pose>
+      <link name="link">
+        <collision name="col"><geometry><box><size>0.6179 0.1000 0.5000</size></box></geometry></collision>
+        <visual name="vis">
+          <geometry><box><size>0.6179 0.1000 0.5000</size></box></geometry>
+          <material><ambient>0.87 0.72 0.53 1</ambient><diffuse>0.87 0.72 0.53 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+    <model name="izq_ext_a_05">
+      <static>true</static>
+      <pose>-3.9499 3.0613 0.2500 0 0.0000 3.2761</pose>
+      <link name="link">
+        <collision name="col"><geometry><box><size>0.6179 0.1000 0.5000</size></box></geometry></collision>
+        <visual name="vis">
+          <geometry><box><size>0.6179 0.1000 0.5000</size></box></geometry>
+          <material><ambient>0.87 0.72 0.53 1</ambient><diffuse>0.87 0.72 0.53 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+    <model name="izq_ext_a_06">
+      <static>true</static>
+      <pose>-4.4537 2.9495 0.2500 0 0.0000 3.4434</pose>
+      <link name="link">
+        <collision name="col"><geometry><box><size>0.6179 0.1000 0.5000</size></box></geometry></collision>
+        <visual name="vis">
+          <geometry><box><size>0.6179 0.1000 0.5000</size></box></geometry>
+          <material><ambient>0.87 0.72 0.53 1</ambient><diffuse>0.87 0.72 0.53 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+    <model name="izq_ext_a_07">
+      <static>true</static>
+      <pose>-4.9320 2.7555 0.2500 0 0.0000 3.6106</pose>
+      <link name="link">
+        <collision name="col"><geometry><box><size>0.6179 0.1000 0.5000</size></box></geometry></collision>
+        <visual name="vis">
+          <geometry><box><size>0.6179 0.1000 0.5000</size></box></geometry>
+          <material><ambient>0.87 0.72 0.53 1</ambient><diffuse>0.87 0.72 0.53 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+    <model name="izq_ext_a_08">
+      <static>true</static>
+      <pose>-5.3712 2.4846 0.2500 0 0.0000 3.7779</pose>
+      <link name="link">
+        <collision name="col"><geometry><box><size>0.6179 0.1000 0.5000</size></box></geometry></collision>
+        <visual name="vis">
+          <geometry><box><size>0.6179 0.1000 0.5000</size></box></geometry>
+          <material><ambient>0.87 0.72 0.53 1</ambient><diffuse>0.87 0.72 0.53 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+    <model name="izq_ext_a_09">
+      <static>true</static>
+      <pose>-5.7593 2.1443 0.2500 0 0.0000 3.9452</pose>
+      <link name="link">
+        <collision name="col"><geometry><box><size>0.6179 0.1000 0.5000</size></box></geometry></collision>
+        <visual name="vis">
+          <geometry><box><size>0.6179 0.1000 0.5000</size></box></geometry>
+          <material><ambient>0.87 0.72 0.53 1</ambient><diffuse>0.87 0.72 0.53 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+    <model name="izq_ext_a_10">
+      <static>true</static>
+      <pose>-6.0852 1.7442 0.2500 0 0.0000 4.1124</pose>
+      <link name="link">
+        <collision name="col"><geometry><box><size>0.6179 0.1000 0.5000</size></box></geometry></collision>
+        <visual name="vis">
+          <geometry><box><size>0.6179 0.1000 0.5000</size></box></geometry>
+          <material><ambient>0.87 0.72 0.53 1</ambient><diffuse>0.87 0.72 0.53 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+    <model name="izq_ext_a_11">
+      <static>true</static>
+      <pose>-6.3400 1.2953 0.2500 0 0.0000 4.2797</pose>
+      <link name="link">
+        <collision name="col"><geometry><box><size>0.6179 0.1000 0.5000</size></box></geometry></collision>
+        <visual name="vis">
+          <geometry><box><size>0.6179 0.1000 0.5000</size></box></geometry>
+          <material><ambient>0.87 0.72 0.53 1</ambient><diffuse>0.87 0.72 0.53 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+    <model name="izq_ext_n_00">
+      <static>true</static>
+      <pose>-6.2779 0.7348 0.2500 0 0.0000 4.4506</pose>
+      <link name="link">
+        <collision name="col"><geometry><box><size>0.5968 0.1000 0.5000</size></box></geometry></collision>
+        <visual name="vis">
+          <geometry><box><size>0.5968 0.1000 0.5000</size></box></geometry>
+          <material><ambient>0.87 0.72 0.53 1</ambient><diffuse>0.87 0.72 0.53 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+    <model name="izq_ext_n_01">
+      <static>true</static>
+      <pose>-6.3639 0.2474 0.2500 0 0.0000 4.6251</pose>
+      <link name="link">
+        <collision name="col"><geometry><box><size>0.5968 0.1000 0.5000</size></box></geometry></collision>
+        <visual name="vis">
+          <geometry><box><size>0.5968 0.1000 0.5000</size></box></geometry>
+          <material><ambient>0.87 0.72 0.53 1</ambient><diffuse>0.87 0.72 0.53 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+    <model name="izq_ext_n_02">
+      <static>true</static>
+      <pose>-6.3639 -0.2474 0.2500 0 0.0000 4.7997</pose>
+      <link name="link">
+        <collision name="col"><geometry><box><size>0.5968 0.1000 0.5000</size></box></geometry></collision>
+        <visual name="vis">
+          <geometry><box><size>0.5968 0.1000 0.5000</size></box></geometry>
+          <material><ambient>0.87 0.72 0.53 1</ambient><diffuse>0.87 0.72 0.53 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+    <model name="izq_ext_n_03">
+      <static>true</static>
+      <pose>-6.2779 -0.7348 0.2500 0 0.0000 4.9742</pose>
+      <link name="link">
+        <collision name="col"><geometry><box><size>0.5968 0.1000 0.5000</size></box></geometry></collision>
+        <visual name="vis">
+          <geometry><box><size>0.5968 0.1000 0.5000</size></box></geometry>
+          <material><ambient>0.87 0.72 0.53 1</ambient><diffuse>0.87 0.72 0.53 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+    <model name="izq_ext_b_00">
+      <static>true</static>
+      <pose>-6.3400 -1.2953 0.2500 0 0.0000 5.1451</pose>
+      <link name="link">
+        <collision name="col"><geometry><box><size>0.6179 0.1000 0.5000</size></box></geometry></collision>
+        <visual name="vis">
+          <geometry><box><size>0.6179 0.1000 0.5000</size></box></geometry>
+          <material><ambient>0.87 0.72 0.53 1</ambient><diffuse>0.87 0.72 0.53 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+    <model name="izq_ext_b_01">
+      <static>true</static>
+      <pose>-6.0852 -1.7442 0.2500 0 0.0000 5.3123</pose>
+      <link name="link">
+        <collision name="col"><geometry><box><size>0.6179 0.1000 0.5000</size></box></geometry></collision>
+        <visual name="vis">
+          <geometry><box><size>0.6179 0.1000 0.5000</size></box></geometry>
+          <material><ambient>0.87 0.72 0.53 1</ambient><diffuse>0.87 0.72 0.53 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+    <model name="izq_ext_b_02">
+      <static>true</static>
+      <pose>-5.7593 -2.1443 0.2500 0 0.0000 5.4796</pose>
+      <link name="link">
+        <collision name="col"><geometry><box><size>0.6179 0.1000 0.5000</size></box></geometry></collision>
+        <visual name="vis">
+          <geometry><box><size>0.6179 0.1000 0.5000</size></box></geometry>
+          <material><ambient>0.87 0.72 0.53 1</ambient><diffuse>0.87 0.72 0.53 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+    <model name="izq_ext_b_03">
+      <static>true</static>
+      <pose>-5.3712 -2.4846 0.2500 0 0.0000 5.6469</pose>
+      <link name="link">
+        <collision name="col"><geometry><box><size>0.6179 0.1000 0.5000</size></box></geometry></collision>
+        <visual name="vis">
+          <geometry><box><size>0.6179 0.1000 0.5000</size></box></geometry>
+          <material><ambient>0.87 0.72 0.53 1</ambient><diffuse>0.87 0.72 0.53 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+    <model name="izq_ext_b_04">
+      <static>true</static>
+      <pose>-4.9320 -2.7555 0.2500 0 0.0000 5.8141</pose>
+      <link name="link">
+        <collision name="col"><geometry><box><size>0.6179 0.1000 0.5000</size></box></geometry></collision>
+        <visual name="vis">
+          <geometry><box><size>0.6179 0.1000 0.5000</size></box></geometry>
+          <material><ambient>0.87 0.72 0.53 1</ambient><diffuse>0.87 0.72 0.53 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+    <model name="izq_ext_b_05">
+      <static>true</static>
+      <pose>-4.4537 -2.9495 0.2500 0 0.0000 5.9814</pose>
+      <link name="link">
+        <collision name="col"><geometry><box><size>0.6179 0.1000 0.5000</size></box></geometry></collision>
+        <visual name="vis">
+          <geometry><box><size>0.6179 0.1000 0.5000</size></box></geometry>
+          <material><ambient>0.87 0.72 0.53 1</ambient><diffuse>0.87 0.72 0.53 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+    <model name="izq_ext_b_06">
+      <static>true</static>
+      <pose>-3.9499 -3.0613 0.2500 0 0.0000 6.1486</pose>
+      <link name="link">
+        <collision name="col"><geometry><box><size>0.6179 0.1000 0.5000</size></box></geometry></collision>
+        <visual name="vis">
+          <geometry><box><size>0.6179 0.1000 0.5000</size></box></geometry>
+          <material><ambient>0.87 0.72 0.53 1</ambient><diffuse>0.87 0.72 0.53 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+    <model name="izq_ext_b_07">
+      <static>true</static>
+      <pose>-3.4345 -3.0875 0.2500 0 0.0000 6.3159</pose>
+      <link name="link">
+        <collision name="col"><geometry><box><size>0.6179 0.1000 0.5000</size></box></geometry></collision>
+        <visual name="vis">
+          <geometry><box><size>0.6179 0.1000 0.5000</size></box></geometry>
+          <material><ambient>0.87 0.72 0.53 1</ambient><diffuse>0.87 0.72 0.53 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+    <model name="izq_ext_b_08">
+      <static>true</static>
+      <pose>-2.9219 -3.0276 0.2500 0 0.0000 6.4832</pose>
+      <link name="link">
+        <collision name="col"><geometry><box><size>0.6179 0.1000 0.5000</size></box></geometry></collision>
+        <visual name="vis">
+          <geometry><box><size>0.6179 0.1000 0.5000</size></box></geometry>
+          <material><ambient>0.87 0.72 0.53 1</ambient><diffuse>0.87 0.72 0.53 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+    <model name="izq_ext_b_09">
+      <static>true</static>
+      <pose>-2.4264 -2.8832 0.2500 0 0.0000 6.6504</pose>
+      <link name="link">
+        <collision name="col"><geometry><box><size>0.6179 0.1000 0.5000</size></box></geometry></collision>
+        <visual name="vis">
+          <geometry><box><size>0.6179 0.1000 0.5000</size></box></geometry>
+          <material><ambient>0.87 0.72 0.53 1</ambient><diffuse>0.87 0.72 0.53 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+    <model name="izq_ext_b_10">
+      <static>true</static>
+      <pose>-1.9619 -2.6583 0.2500 0 0.0000 6.8177</pose>
+      <link name="link">
+        <collision name="col"><geometry><box><size>0.6179 0.1000 0.5000</size></box></geometry></collision>
+        <visual name="vis">
+          <geometry><box><size>0.6179 0.1000 0.5000</size></box></geometry>
+          <material><ambient>0.87 0.72 0.53 1</ambient><diffuse>0.87 0.72 0.53 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+    <model name="izq_ext_b_11">
+      <static>true</static>
+      <pose>-1.5413 -2.3592 0.2500 0 0.0000 6.9850</pose>
+      <link name="link">
+        <collision name="col"><geometry><box><size>0.6179 0.1000 0.5000</size></box></geometry></collision>
+        <visual name="vis">
+          <geometry><box><size>0.6179 0.1000 0.5000</size></box></geometry>
+          <material><ambient>0.87 0.72 0.53 1</ambient><diffuse>0.87 0.72 0.53 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+    <model name="izq_int_a_00">
+      <static>true</static>
+      <pose>-2.3132 1.4460 0.2500 0 0.0000 2.4398</pose>
+      <link name="link">
+        <collision name="col"><geometry><box><size>0.4174 0.1000 0.5000</size></box></geometry></collision>
+        <visual name="vis">
+          <geometry><box><size>0.4174 0.1000 0.5000</size></box></geometry>
+          <material><ambient>0.87 0.72 0.53 1</ambient><diffuse>0.87 0.72 0.53 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+    <model name="izq_int_a_01">
+      <static>true</static>
+      <pose>-2.5710 1.6293 0.2500 0 0.0000 2.6071</pose>
+      <link name="link">
+        <collision name="col"><geometry><box><size>0.4174 0.1000 0.5000</size></box></geometry></collision>
+        <visual name="vis">
+          <geometry><box><size>0.4174 0.1000 0.5000</size></box></geometry>
+          <material><ambient>0.87 0.72 0.53 1</ambient><diffuse>0.87 0.72 0.53 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+    <model name="izq_int_a_02">
+      <static>true</static>
+      <pose>-2.8557 1.7671 0.2500 0 0.0000 2.7743</pose>
+      <link name="link">
+        <collision name="col"><geometry><box><size>0.4174 0.1000 0.5000</size></box></geometry></collision>
+        <visual name="vis">
+          <geometry><box><size>0.4174 0.1000 0.5000</size></box></geometry>
+          <material><ambient>0.87 0.72 0.53 1</ambient><diffuse>0.87 0.72 0.53 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+    <model name="izq_int_a_03">
+      <static>true</static>
+      <pose>-3.1594 1.8556 0.2500 0 0.0000 2.9416</pose>
+      <link name="link">
+        <collision name="col"><geometry><box><size>0.4174 0.1000 0.5000</size></box></geometry></collision>
+        <visual name="vis">
+          <geometry><box><size>0.4174 0.1000 0.5000</size></box></geometry>
+          <material><ambient>0.87 0.72 0.53 1</ambient><diffuse>0.87 0.72 0.53 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+    <model name="izq_int_a_04">
+      <static>true</static>
+      <pose>-3.4736 1.8923 0.2500 0 0.0000 3.1089</pose>
+      <link name="link">
+        <collision name="col"><geometry><box><size>0.4174 0.1000 0.5000</size></box></geometry></collision>
+        <visual name="vis">
+          <geometry><box><size>0.4174 0.1000 0.5000</size></box></geometry>
+          <material><ambient>0.87 0.72 0.53 1</ambient><diffuse>0.87 0.72 0.53 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+    <model name="izq_int_a_05">
+      <static>true</static>
+      <pose>-3.7895 1.8763 0.2500 0 0.0000 3.2761</pose>
+      <link name="link">
+        <collision name="col"><geometry><box><size>0.4174 0.1000 0.5000</size></box></geometry></collision>
+        <visual name="vis">
+          <geometry><box><size>0.4174 0.1000 0.5000</size></box></geometry>
+          <material><ambient>0.87 0.72 0.53 1</ambient><diffuse>0.87 0.72 0.53 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+    <model name="izq_int_a_06">
+      <static>true</static>
+      <pose>-4.0983 1.8078 0.2500 0 0.0000 3.4434</pose>
+      <link name="link">
+        <collision name="col"><geometry><box><size>0.4174 0.1000 0.5000</size></box></geometry></collision>
+        <visual name="vis">
+          <geometry><box><size>0.4174 0.1000 0.5000</size></box></geometry>
+          <material><ambient>0.87 0.72 0.53 1</ambient><diffuse>0.87 0.72 0.53 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+    <model name="izq_int_a_07">
+      <static>true</static>
+      <pose>-4.3914 1.6889 0.2500 0 0.0000 3.6106</pose>
+      <link name="link">
+        <collision name="col"><geometry><box><size>0.4174 0.1000 0.5000</size></box></geometry></collision>
+        <visual name="vis">
+          <geometry><box><size>0.4174 0.1000 0.5000</size></box></geometry>
+          <material><ambient>0.87 0.72 0.53 1</ambient><diffuse>0.87 0.72 0.53 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+    <model name="izq_int_a_08">
+      <static>true</static>
+      <pose>-4.6606 1.5228 0.2500 0 0.0000 3.7779</pose>
+      <link name="link">
+        <collision name="col"><geometry><box><size>0.4174 0.1000 0.5000</size></box></geometry></collision>
+        <visual name="vis">
+          <geometry><box><size>0.4174 0.1000 0.5000</size></box></geometry>
+          <material><ambient>0.87 0.72 0.53 1</ambient><diffuse>0.87 0.72 0.53 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+    <model name="izq_int_a_09">
+      <static>true</static>
+      <pose>-4.8985 1.3142 0.2500 0 0.0000 3.9452</pose>
+      <link name="link">
+        <collision name="col"><geometry><box><size>0.4174 0.1000 0.5000</size></box></geometry></collision>
+        <visual name="vis">
+          <geometry><box><size>0.4174 0.1000 0.5000</size></box></geometry>
+          <material><ambient>0.87 0.72 0.53 1</ambient><diffuse>0.87 0.72 0.53 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+    <model name="izq_int_a_10">
+      <static>true</static>
+      <pose>-5.0982 1.0690 0.2500 0 0.0000 4.1124</pose>
+      <link name="link">
+        <collision name="col"><geometry><box><size>0.4174 0.1000 0.5000</size></box></geometry></collision>
+        <visual name="vis">
+          <geometry><box><size>0.4174 0.1000 0.5000</size></box></geometry>
+          <material><ambient>0.87 0.72 0.53 1</ambient><diffuse>0.87 0.72 0.53 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+    <model name="izq_int_a_11">
+      <static>true</static>
+      <pose>-5.2544 0.7939 0.2500 0 0.0000 4.2797</pose>
+      <link name="link">
+        <collision name="col"><geometry><box><size>0.4174 0.1000 0.5000</size></box></geometry></collision>
+        <visual name="vis">
+          <geometry><box><size>0.4174 0.1000 0.5000</size></box></geometry>
+          <material><ambient>0.87 0.72 0.53 1</ambient><diffuse>0.87 0.72 0.53 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+    <model name="izq_int_n_00">
+      <static>true</static>
+      <pose>-5.6044 0.5543 0.2500 0 0.0000 4.4506</pose>
+      <link name="link">
+        <collision name="col"><geometry><box><size>0.4748 0.1000 0.5000</size></box></geometry></collision>
+        <visual name="vis">
+          <geometry><box><size>0.4748 0.1000 0.5000</size></box></geometry>
+          <material><ambient>0.87 0.72 0.53 1</ambient><diffuse>0.87 0.72 0.53 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+    <model name="izq_int_n_01">
+      <static>true</static>
+      <pose>-5.6692 0.1867 0.2500 0 0.0000 4.6251</pose>
+      <link name="link">
+        <collision name="col"><geometry><box><size>0.4748 0.1000 0.5000</size></box></geometry></collision>
+        <visual name="vis">
+          <geometry><box><size>0.4748 0.1000 0.5000</size></box></geometry>
+          <material><ambient>0.87 0.72 0.53 1</ambient><diffuse>0.87 0.72 0.53 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+    <model name="izq_int_n_02">
+      <static>true</static>
+      <pose>-5.6692 -0.1867 0.2500 0 0.0000 4.7997</pose>
+      <link name="link">
+        <collision name="col"><geometry><box><size>0.4748 0.1000 0.5000</size></box></geometry></collision>
+        <visual name="vis">
+          <geometry><box><size>0.4748 0.1000 0.5000</size></box></geometry>
+          <material><ambient>0.87 0.72 0.53 1</ambient><diffuse>0.87 0.72 0.53 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+    <model name="izq_int_n_03">
+      <static>true</static>
+      <pose>-5.6044 -0.5543 0.2500 0 0.0000 4.9742</pose>
+      <link name="link">
+        <collision name="col"><geometry><box><size>0.4748 0.1000 0.5000</size></box></geometry></collision>
+        <visual name="vis">
+          <geometry><box><size>0.4748 0.1000 0.5000</size></box></geometry>
+          <material><ambient>0.87 0.72 0.53 1</ambient><diffuse>0.87 0.72 0.53 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+    <model name="izq_int_b_00">
+      <static>true</static>
+      <pose>-5.2544 -0.7939 0.2500 0 0.0000 5.1451</pose>
+      <link name="link">
+        <collision name="col"><geometry><box><size>0.4174 0.1000 0.5000</size></box></geometry></collision>
+        <visual name="vis">
+          <geometry><box><size>0.4174 0.1000 0.5000</size></box></geometry>
+          <material><ambient>0.87 0.72 0.53 1</ambient><diffuse>0.87 0.72 0.53 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+    <model name="izq_int_b_01">
+      <static>true</static>
+      <pose>-5.0982 -1.0690 0.2500 0 0.0000 5.3123</pose>
+      <link name="link">
+        <collision name="col"><geometry><box><size>0.4174 0.1000 0.5000</size></box></geometry></collision>
+        <visual name="vis">
+          <geometry><box><size>0.4174 0.1000 0.5000</size></box></geometry>
+          <material><ambient>0.87 0.72 0.53 1</ambient><diffuse>0.87 0.72 0.53 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+    <model name="izq_int_b_02">
+      <static>true</static>
+      <pose>-4.8985 -1.3142 0.2500 0 0.0000 5.4796</pose>
+      <link name="link">
+        <collision name="col"><geometry><box><size>0.4174 0.1000 0.5000</size></box></geometry></collision>
+        <visual name="vis">
+          <geometry><box><size>0.4174 0.1000 0.5000</size></box></geometry>
+          <material><ambient>0.87 0.72 0.53 1</ambient><diffuse>0.87 0.72 0.53 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+    <model name="izq_int_b_03">
+      <static>true</static>
+      <pose>-4.6606 -1.5228 0.2500 0 0.0000 5.6469</pose>
+      <link name="link">
+        <collision name="col"><geometry><box><size>0.4174 0.1000 0.5000</size></box></geometry></collision>
+        <visual name="vis">
+          <geometry><box><size>0.4174 0.1000 0.5000</size></box></geometry>
+          <material><ambient>0.87 0.72 0.53 1</ambient><diffuse>0.87 0.72 0.53 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+    <model name="izq_int_b_04">
+      <static>true</static>
+      <pose>-4.3914 -1.6889 0.2500 0 0.0000 5.8141</pose>
+      <link name="link">
+        <collision name="col"><geometry><box><size>0.4174 0.1000 0.5000</size></box></geometry></collision>
+        <visual name="vis">
+          <geometry><box><size>0.4174 0.1000 0.5000</size></box></geometry>
+          <material><ambient>0.87 0.72 0.53 1</ambient><diffuse>0.87 0.72 0.53 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+    <model name="izq_int_b_05">
+      <static>true</static>
+      <pose>-4.0983 -1.8078 0.2500 0 0.0000 5.9814</pose>
+      <link name="link">
+        <collision name="col"><geometry><box><size>0.4174 0.1000 0.5000</size></box></geometry></collision>
+        <visual name="vis">
+          <geometry><box><size>0.4174 0.1000 0.5000</size></box></geometry>
+          <material><ambient>0.87 0.72 0.53 1</ambient><diffuse>0.87 0.72 0.53 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+    <model name="izq_int_b_06">
+      <static>true</static>
+      <pose>-3.7895 -1.8763 0.2500 0 0.0000 6.1486</pose>
+      <link name="link">
+        <collision name="col"><geometry><box><size>0.4174 0.1000 0.5000</size></box></geometry></collision>
+        <visual name="vis">
+          <geometry><box><size>0.4174 0.1000 0.5000</size></box></geometry>
+          <material><ambient>0.87 0.72 0.53 1</ambient><diffuse>0.87 0.72 0.53 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+    <model name="izq_int_b_07">
+      <static>true</static>
+      <pose>-3.4736 -1.8923 0.2500 0 0.0000 6.3159</pose>
+      <link name="link">
+        <collision name="col"><geometry><box><size>0.4174 0.1000 0.5000</size></box></geometry></collision>
+        <visual name="vis">
+          <geometry><box><size>0.4174 0.1000 0.5000</size></box></geometry>
+          <material><ambient>0.87 0.72 0.53 1</ambient><diffuse>0.87 0.72 0.53 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+    <model name="izq_int_b_08">
+      <static>true</static>
+      <pose>-3.1594 -1.8556 0.2500 0 0.0000 6.4832</pose>
+      <link name="link">
+        <collision name="col"><geometry><box><size>0.4174 0.1000 0.5000</size></box></geometry></collision>
+        <visual name="vis">
+          <geometry><box><size>0.4174 0.1000 0.5000</size></box></geometry>
+          <material><ambient>0.87 0.72 0.53 1</ambient><diffuse>0.87 0.72 0.53 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+    <model name="izq_int_b_09">
+      <static>true</static>
+      <pose>-2.8557 -1.7671 0.2500 0 0.0000 6.6504</pose>
+      <link name="link">
+        <collision name="col"><geometry><box><size>0.4174 0.1000 0.5000</size></box></geometry></collision>
+        <visual name="vis">
+          <geometry><box><size>0.4174 0.1000 0.5000</size></box></geometry>
+          <material><ambient>0.87 0.72 0.53 1</ambient><diffuse>0.87 0.72 0.53 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+    <model name="izq_int_b_10">
+      <static>true</static>
+      <pose>-2.5710 -1.6293 0.2500 0 0.0000 6.8177</pose>
+      <link name="link">
+        <collision name="col"><geometry><box><size>0.4174 0.1000 0.5000</size></box></geometry></collision>
+        <visual name="vis">
+          <geometry><box><size>0.4174 0.1000 0.5000</size></box></geometry>
+          <material><ambient>0.87 0.72 0.53 1</ambient><diffuse>0.87 0.72 0.53 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+    <model name="izq_int_b_11">
+      <static>true</static>
+      <pose>-2.3132 -1.4460 0.2500 0 0.0000 6.9850</pose>
+      <link name="link">
+        <collision name="col"><geometry><box><size>0.4174 0.1000 0.5000</size></box></geometry></collision>
+        <visual name="vis">
+          <geometry><box><size>0.4174 0.1000 0.5000</size></box></geometry>
+          <material><ambient>0.87 0.72 0.53 1</ambient><diffuse>0.87 0.72 0.53 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+    <model name="estrech_ext_0">
+      <static>true</static>
+      <pose>-6.3311 1.0175 0.2500 0 0.0000 2.7925</pose>
+      <link name="link">
+        <collision name="col"><geometry><box><size>0.3500 0.1000 0.5000</size></box></geometry></collision>
+        <visual name="vis">
+          <geometry><box><size>0.3500 0.1000 0.5000</size></box></geometry>
+          <material><ambient>0.87 0.72 0.53 1</ambient><diffuse>0.87 0.72 0.53 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+    <model name="estrech_int_0">
+      <static>true</static>
+      <pose>-5.4384 0.6926 0.2500 0 0.0000 2.7925</pose>
+      <link name="link">
+        <collision name="col"><geometry><box><size>0.3500 0.1000 0.5000</size></box></geometry></collision>
+        <visual name="vis">
+          <geometry><box><size>0.3500 0.1000 0.5000</size></box></geometry>
+          <material><ambient>0.87 0.72 0.53 1</ambient><diffuse>0.87 0.72 0.53 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+    <model name="estrech_ext_1">
+      <static>true</static>
+      <pose>-6.3311 -1.0175 0.2500 0 0.0000 3.4907</pose>
+      <link name="link">
+        <collision name="col"><geometry><box><size>0.3500 0.1000 0.5000</size></box></geometry></collision>
+        <visual name="vis">
+          <geometry><box><size>0.3500 0.1000 0.5000</size></box></geometry>
+          <material><ambient>0.87 0.72 0.53 1</ambient><diffuse>0.87 0.72 0.53 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+    <model name="estrech_int_1">
+      <static>true</static>
+      <pose>-5.4384 -0.6926 0.2500 0 0.0000 3.4907</pose>
+      <link name="link">
+        <collision name="col"><geometry><box><size>0.3500 0.1000 0.5000</size></box></geometry></collision>
+        <visual name="vis">
+          <geometry><box><size>0.3500 0.1000 0.5000</size></box></geometry>
+          <material><ambient>0.87 0.72 0.53 1</ambient><diffuse>0.87 0.72 0.53 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+    <model name="rectaB_L_bajo">
+      <static>true</static>
+      <pose>0.4243 0.4243 0.1100 0 0.0000 -0.7854</pose>
+      <link name="link">
+        <collision name="col"><geometry><box><size>1.3000 0.1000 0.2200</size></box></geometry></collision>
+        <visual name="vis">
+          <geometry><box><size>1.3000 0.1000 0.2200</size></box></geometry>
+          <material><ambient>0.65 0.45 0.28 1</ambient><diffuse>0.65 0.45 0.28 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+    <model name="rectaB_Lp">
+      <static>true</static>
+      <pose>1.5380 -0.6894 0.2500 0 0.0000 -0.7854</pose>
+      <link name="link">
+        <collision name="col"><geometry><box><size>1.9000 0.1000 0.5000</size></box></geometry></collision>
+        <visual name="vis">
+          <geometry><box><size>1.9000 0.1000 0.5000</size></box></geometry>
+          <material><ambient>0.87 0.72 0.53 1</ambient><diffuse>0.87 0.72 0.53 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+    <model name="rectaB_Ln">
+      <static>true</static>
+      <pose>-0.6894 1.5380 0.2500 0 0.0000 -0.7854</pose>
+      <link name="link">
+        <collision name="col"><geometry><box><size>1.9000 0.1000 0.5000</size></box></geometry></collision>
+        <visual name="vis">
+          <geometry><box><size>1.9000 0.1000 0.5000</size></box></geometry>
+          <material><ambient>0.87 0.72 0.53 1</ambient><diffuse>0.87 0.72 0.53 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+    <model name="rectaB_R_bajo">
+      <static>true</static>
+      <pose>-0.4243 -0.4243 0.1100 0 0.0000 -0.7854</pose>
+      <link name="link">
+        <collision name="col"><geometry><box><size>1.3000 0.1000 0.2200</size></box></geometry></collision>
+        <visual name="vis">
+          <geometry><box><size>1.3000 0.1000 0.2200</size></box></geometry>
+          <material><ambient>0.65 0.45 0.28 1</ambient><diffuse>0.65 0.45 0.28 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+    <model name="rectaB_Rp">
+      <static>true</static>
+      <pose>0.6894 -1.5380 0.2500 0 0.0000 -0.7854</pose>
+      <link name="link">
+        <collision name="col"><geometry><box><size>1.9000 0.1000 0.5000</size></box></geometry></collision>
+        <visual name="vis">
+          <geometry><box><size>1.9000 0.1000 0.5000</size></box></geometry>
+          <material><ambient>0.87 0.72 0.53 1</ambient><diffuse>0.87 0.72 0.53 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+    <model name="rectaB_Rn">
+      <static>true</static>
+      <pose>-1.5380 0.6894 0.2500 0 0.0000 -0.7854</pose>
+      <link name="link">
+        <collision name="col"><geometry><box><size>1.9000 0.1000 0.5000</size></box></geometry></collision>
+        <visual name="vis">
+          <geometry><box><size>1.9000 0.1000 0.5000</size></box></geometry>
+          <material><ambient>0.87 0.72 0.53 1</ambient><diffuse>0.87 0.72 0.53 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+    <model name="puente_tablero">
+      <static>true</static>
+      <pose>0.0000 0.0000 0.2800 0 0.0000 0.7854</pose>
+      <link name="link">
+        <collision name="col"><geometry><box><size>1.4000 1.2500 0.0400</size></box></geometry></collision>
+        <visual name="vis">
+          <geometry><box><size>1.4000 1.2500 0.0400</size></box></geometry>
+          <material><ambient>0.87 0.72 0.53 1</ambient><diffuse>0.87 0.72 0.53 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+    <model name="puente_baranda_L">
+      <static>true</static>
+      <pose>-0.4243 0.4243 0.4000 0 0.0000 0.7854</pose>
+      <link name="link">
+        <collision name="col"><geometry><box><size>1.4000 0.0500 0.2000</size></box></geometry></collision>
+        <visual name="vis">
+          <geometry><box><size>1.4000 0.0500 0.2000</size></box></geometry>
+          <material><ambient>0.65 0.45 0.28 1</ambient><diffuse>0.65 0.45 0.28 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+    <model name="puente_baranda_R">
+      <static>true</static>
+      <pose>0.4243 -0.4243 0.4000 0 0.0000 0.7854</pose>
+      <link name="link">
+        <collision name="col"><geometry><box><size>1.4000 0.0500 0.2000</size></box></geometry></collision>
+        <visual name="vis">
+          <geometry><box><size>1.4000 0.0500 0.2000</size></box></geometry>
+          <material><ambient>0.65 0.45 0.28 1</ambient><diffuse>0.65 0.45 0.28 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+    <model name="rampa_p">
+      <static>true</static>
+      <pose>1.1290 1.1290 0.1303 0 -0.1651 3.9270</pose>
+      <link name="link">
+        <collision name="col"><geometry><box><size>1.8248 1.2500 0.0400</size></box></geometry></collision>
+        <visual name="vis">
+          <geometry><box><size>1.8248 1.2500 0.0400</size></box></geometry>
+          <material><ambient>0.87 0.72 0.53 1</ambient><diffuse>0.87 0.72 0.53 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+    <model name="rampa_p_baranda_L">
+      <static>true</static>
+      <pose>0.7187 1.5673 0.2486 0 -0.1651 3.9270</pose>
+      <link name="link">
+        <collision name="col"><geometry><box><size>1.8248 0.0500 0.2000</size></box></geometry></collision>
+        <visual name="vis">
+          <geometry><box><size>1.8248 0.0500 0.2000</size></box></geometry>
+          <material><ambient>0.65 0.45 0.28 1</ambient><diffuse>0.65 0.45 0.28 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+    <model name="rampa_p_baranda_R">
+      <static>true</static>
+      <pose>1.5673 0.7187 0.2486 0 -0.1651 3.9270</pose>
+      <link name="link">
+        <collision name="col"><geometry><box><size>1.8248 0.0500 0.2000</size></box></geometry></collision>
+        <visual name="vis">
+          <geometry><box><size>1.8248 0.0500 0.2000</size></box></geometry>
+          <material><ambient>0.65 0.45 0.28 1</ambient><diffuse>0.65 0.45 0.28 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+    <model name="rampa_n">
+      <static>true</static>
+      <pose>-1.1290 -1.1290 0.1303 0 -0.1651 0.7854</pose>
+      <link name="link">
+        <collision name="col"><geometry><box><size>1.8248 1.2500 0.0400</size></box></geometry></collision>
+        <visual name="vis">
+          <geometry><box><size>1.8248 1.2500 0.0400</size></box></geometry>
+          <material><ambient>0.87 0.72 0.53 1</ambient><diffuse>0.87 0.72 0.53 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+    <model name="rampa_n_baranda_L">
+      <static>true</static>
+      <pose>-1.5673 -0.7187 0.2486 0 -0.1651 0.7854</pose>
+      <link name="link">
+        <collision name="col"><geometry><box><size>1.8248 0.0500 0.2000</size></box></geometry></collision>
+        <visual name="vis">
+          <geometry><box><size>1.8248 0.0500 0.2000</size></box></geometry>
+          <material><ambient>0.65 0.45 0.28 1</ambient><diffuse>0.65 0.45 0.28 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+    <model name="rampa_n_baranda_R">
+      <static>true</static>
+      <pose>-0.7187 -1.5673 0.2486 0 -0.1651 0.7854</pose>
+      <link name="link">
+        <collision name="col"><geometry><box><size>1.8248 0.0500 0.2000</size></box></geometry></collision>
+        <visual name="vis">
+          <geometry><box><size>1.8248 0.0500 0.2000</size></box></geometry>
+          <material><ambient>0.65 0.45 0.28 1</ambient><diffuse>0.65 0.45 0.28 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+    <model name="obstaculo_0">
+      <static>true</static>
+      <pose>4.9355 2.4249 0.200 0 0 0</pose>
+      <link name="link">
+        <collision name="col"><geometry><cylinder><radius>0.15</radius><length>0.4</length></cylinder></geometry></collision>
+        <visual name="vis">
+          <geometry><cylinder><radius>0.15</radius><length>0.4</length></cylinder></geometry>
+          <material><ambient>0.85 0.15 0.15 1</ambient><diffuse>0.85 0.15 0.15 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+    <model name="obstaculo_1">
+      <static>true</static>
+      <pose>5.7355 0.0000 0.200 0 0 0</pose>
+      <link name="link">
+        <collision name="col"><geometry><cylinder><radius>0.15</radius><length>0.4</length></cylinder></geometry></collision>
+        <visual name="vis">
+          <geometry><cylinder><radius>0.15</radius><length>0.4</length></cylinder></geometry>
+          <material><ambient>0.95 0.80 0.10 1</ambient><diffuse>0.95 0.80 0.10 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+    <model name="obstaculo_2">
+      <static>true</static>
+      <pose>4.9355 -2.4249 0.200 0 0 0</pose>
+      <link name="link">
+        <collision name="col"><geometry><cylinder><radius>0.15</radius><length>0.4</length></cylinder></geometry></collision>
+        <visual name="vis">
+          <geometry><cylinder><radius>0.15</radius><length>0.4</length></cylinder></geometry>
+          <material><ambient>0.20 0.40 0.85 1</ambient><diffuse>0.20 0.40 0.85 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+    <model name="casa_izq">
+      <static>true</static>
+      <pose>-3.5355 0.0000 0.2500 0 0.0000 0.3000</pose>
+      <link name="link">
+        <collision name="col"><geometry><box><size>0.6000 0.4000 0.5000</size></box></geometry></collision>
+        <visual name="vis">
+          <geometry><box><size>0.6000 0.4000 0.5000</size></box></geometry>
+          <material><ambient>0.30 0.50 0.85 1</ambient><diffuse>0.30 0.50 0.85 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+    <model name="casa_der">
+      <static>true</static>
+      <pose>3.2355 0.3000 0.2000 0 0.0000 -0.2000</pose>
+      <link name="link">
+        <collision name="col"><geometry><box><size>0.4000 0.4000 0.4000</size></box></geometry></collision>
+        <visual name="vis">
+          <geometry><box><size>0.4000 0.4000 0.4000</size></box></geometry>
+          <material><ambient>0.95 0.85 0.20 1</ambient><diffuse>0.95 0.85 0.20 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+    <model name="arbol_0">
+      <static>true</static>
+      <pose>-2.7355 0.6000 0 0 0 0</pose>
+      <link name="link">
+        <collision name="col">
+          <pose>0 0 0.340 0 0 0</pose>
+          <geometry><cylinder><radius>0.250</radius><length>0.680</length></cylinder></geometry>
+        </collision>
+        <visual name="tronco">
+          <pose>0 0 0.075 0 0 0</pose>
+          <geometry><cylinder><radius>0.040</radius><length>0.150</length></cylinder></geometry>
+          <material><ambient>0.40 0.26 0.13 1</ambient><diffuse>0.40 0.26 0.13 1</diffuse></material>
+        </visual>
+        <visual name="cono_0">
+          <pose>0 0 0.270 0 0 0</pose>
+          <geometry><cone><radius>0.250</radius><length>0.300</length></cone></geometry>
+          <material><ambient>0.10 0.45 0.15 1</ambient><diffuse>0.10 0.45 0.15 1</diffuse></material>
+        </visual>
+        <visual name="cono_1">
+          <pose>0 0 0.420 0 0 0</pose>
+          <geometry><cone><radius>0.200</radius><length>0.280</length></cone></geometry>
+          <material><ambient>0.15 0.55 0.20 1</ambient><diffuse>0.15 0.55 0.20 1</diffuse></material>
+        </visual>
+        <visual name="cono_2">
+          <pose>0 0 0.560 0 0 0</pose>
+          <geometry><cone><radius>0.140</radius><length>0.240</length></cone></geometry>
+          <material><ambient>0.25 0.65 0.25 1</ambient><diffuse>0.25 0.65 0.25 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+    <model name="arbol_1">
+      <static>true</static>
+      <pose>-4.2355 -0.7000 0 0 0 0</pose>
+      <link name="link">
+        <collision name="col">
+          <pose>0 0 0.408 0 0 0</pose>
+          <geometry><cylinder><radius>0.300</radius><length>0.816</length></cylinder></geometry>
+        </collision>
+        <visual name="tronco">
+          <pose>0 0 0.090 0 0 0</pose>
+          <geometry><cylinder><radius>0.048</radius><length>0.180</length></cylinder></geometry>
+          <material><ambient>0.40 0.26 0.13 1</ambient><diffuse>0.40 0.26 0.13 1</diffuse></material>
+        </visual>
+        <visual name="cono_0">
+          <pose>0 0 0.324 0 0 0</pose>
+          <geometry><cone><radius>0.300</radius><length>0.360</length></cone></geometry>
+          <material><ambient>0.10 0.45 0.15 1</ambient><diffuse>0.10 0.45 0.15 1</diffuse></material>
+        </visual>
+        <visual name="cono_1">
+          <pose>0 0 0.504 0 0 0</pose>
+          <geometry><cone><radius>0.240</radius><length>0.336</length></cone></geometry>
+          <material><ambient>0.15 0.55 0.20 1</ambient><diffuse>0.15 0.55 0.20 1</diffuse></material>
+        </visual>
+        <visual name="cono_2">
+          <pose>0 0 0.672 0 0 0</pose>
+          <geometry><cone><radius>0.168</radius><length>0.288</length></cone></geometry>
+          <material><ambient>0.25 0.65 0.25 1</ambient><diffuse>0.25 0.65 0.25 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+    <model name="arbol_2">
+      <static>true</static>
+      <pose>4.3355 -0.5000 0 0 0 0</pose>
+      <link name="link">
+        <collision name="col">
+          <pose>0 0 0.374 0 0 0</pose>
+          <geometry><cylinder><radius>0.275</radius><length>0.748</length></cylinder></geometry>
+        </collision>
+        <visual name="tronco">
+          <pose>0 0 0.083 0 0 0</pose>
+          <geometry><cylinder><radius>0.044</radius><length>0.165</length></cylinder></geometry>
+          <material><ambient>0.40 0.26 0.13 1</ambient><diffuse>0.40 0.26 0.13 1</diffuse></material>
+        </visual>
+        <visual name="cono_0">
+          <pose>0 0 0.297 0 0 0</pose>
+          <geometry><cone><radius>0.275</radius><length>0.330</length></cone></geometry>
+          <material><ambient>0.10 0.45 0.15 1</ambient><diffuse>0.10 0.45 0.15 1</diffuse></material>
+        </visual>
+        <visual name="cono_1">
+          <pose>0 0 0.462 0 0 0</pose>
+          <geometry><cone><radius>0.220</radius><length>0.308</length></cone></geometry>
+          <material><ambient>0.15 0.55 0.20 1</ambient><diffuse>0.15 0.55 0.20 1</diffuse></material>
+        </visual>
+        <visual name="cono_2">
+          <pose>0 0 0.616 0 0 0</pose>
+          <geometry><cone><radius>0.154</radius><length>0.264</length></cone></geometry>
+          <material><ambient>0.25 0.65 0.25 1</ambient><diffuse>0.25 0.65 0.25 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+    <model name="arbol_3">
+      <static>true</static>
+      <pose>3.8355 0.9000 0 0 0 0</pose>
+      <link name="link">
+        <collision name="col">
+          <pose>0 0 0.306 0 0 0</pose>
+          <geometry><cylinder><radius>0.225</radius><length>0.612</length></cylinder></geometry>
+        </collision>
+        <visual name="tronco">
+          <pose>0 0 0.068 0 0 0</pose>
+          <geometry><cylinder><radius>0.036</radius><length>0.135</length></cylinder></geometry>
+          <material><ambient>0.40 0.26 0.13 1</ambient><diffuse>0.40 0.26 0.13 1</diffuse></material>
+        </visual>
+        <visual name="cono_0">
+          <pose>0 0 0.243 0 0 0</pose>
+          <geometry><cone><radius>0.225</radius><length>0.270</length></cone></geometry>
+          <material><ambient>0.10 0.45 0.15 1</ambient><diffuse>0.10 0.45 0.15 1</diffuse></material>
+        </visual>
+        <visual name="cono_1">
+          <pose>0 0 0.378 0 0 0</pose>
+          <geometry><cone><radius>0.180</radius><length>0.252</length></cone></geometry>
+          <material><ambient>0.15 0.55 0.20 1</ambient><diffuse>0.15 0.55 0.20 1</diffuse></material>
+        </visual>
+        <visual name="cono_2">
+          <pose>0 0 0.504 0 0 0</pose>
+          <geometry><cone><radius>0.126</radius><length>0.216</length></cone></geometry>
+          <material><ambient>0.25 0.65 0.25 1</ambient><diffuse>0.25 0.65 0.25 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+  </world>
+</sdf>

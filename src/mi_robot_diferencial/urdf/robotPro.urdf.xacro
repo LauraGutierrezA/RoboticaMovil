@@ -1,0 +1,186 @@
+<?xml version="1.0"?>
+<robot name="robotPro" xmlns:xacro="http://www.ros.org/wiki/xacro">
+
+
+  <xacro:property name="rueda_radio" value="0.024"/>          
+  <xacro:property name="rueda_ancho" value="0.0215"/>         
+  <xacro:property name="separacion_ruedas" value="0.1315"/>   
+  <xacro:property name="distancia_ejes" value="0.095"/>        
+
+  <!-- Link en el piso: el robot spawnea con las ruedas apoyadas -->
+  <link name="base_footprint"/>
+  <joint name="joint_base" type="fixed">
+    <parent link="base_footprint"/>
+    <child link="base_link"/>
+    <origin xyz="0 0 ${rueda_radio + 0.01}" rpy="0 0 0"/>  <!-- radio + 0.01 (las ruedas están 0.01 por debajo del centro del chasis) -->
+  </joint>
+
+  <link name="base_link">
+    <!-- Chasis inferior -->
+    <visual>
+      <geometry><box size="0.1986 0.10 0.045"/></geometry>
+      <material name="azul"><color rgba="0.2 0.4 0.8 1"/></material>
+    </visual>
+    <!-- Chasis superior -->
+    <visual>
+      <origin xyz="-0.02 0 0.0425" rpy="0 0 0"/>
+      <geometry><box size="0.13 0.09 0.04"/></geometry>
+      <material name="azul"><color rgba="0.2 0.4 0.8 1"/></material>
+    </visual>
+    <collision>
+      <geometry><box size="0.1986 0.10 0.045"/></geometry>
+    </collision>
+    <collision>
+      <origin xyz="-0.02 0 0.0425" rpy="0 0 0"/>
+      <geometry><box size="0.13 0.09 0.04"/></geometry>
+    </collision>
+    <inertial>
+      <mass value="0.75"/>
+      <inertia ixx="0.0009" ixy="0.0" ixz="0.0" iyy="0.0026" iyz="0.0" izz="0.0032"/>
+    </inertial>
+  </link>
+
+  <xacro:macro name="rueda" params="prefijo x_pos y_signo">
+    <link name="rueda_${prefijo}">
+      <visual>
+        <geometry><cylinder radius="${rueda_radio}" length="${rueda_ancho}"/></geometry>
+        <material name="negro"><color rgba="0.1 0.1 0.1 1"/></material>
+      </visual>
+      <collision>
+        <geometry><cylinder radius="${rueda_radio}" length="${rueda_ancho}"/></geometry>
+      </collision>
+      <inertial>
+        <mass value="0.05"/>
+        <inertia ixx="0.00001" ixy="0.0" ixz="0.0" iyy="0.00001" iyz="0.0" izz="0.0000144"/>
+      </inertial>
+    </link>
+
+    <joint name="joint_rueda_${prefijo}" type="continuous">
+      <parent link="base_link"/>
+      <child link="rueda_${prefijo}"/>
+      <origin xyz="${x_pos} ${y_signo * separacion_ruedas/2} -0.01" rpy="-1.5708 0 0"/>
+      <axis xyz="0 0 1"/>
+    </joint>
+  </xacro:macro>
+
+  <xacro:rueda prefijo="izq_del" x_pos="${distancia_ejes/2}"  y_signo="1"/>
+  <xacro:rueda prefijo="izq_tra" x_pos="${-distancia_ejes/2}" y_signo="1"/>
+  <xacro:rueda prefijo="der_del" x_pos="${distancia_ejes/2}"  y_signo="-1"/>
+  <xacro:rueda prefijo="der_tra" x_pos="${-distancia_ejes/2}" y_signo="-1"/>
+
+  <!-- Skid-steer: en gz-sim se hace con DiffDrive poniendo 2 juntas por lado -->
+  <gazebo>
+    <plugin filename="gz-sim-diff-drive-system" name="gz::sim::systems::DiffDrive">
+      <left_joint>joint_rueda_izq_del</left_joint>
+      <left_joint>joint_rueda_izq_tra</left_joint>
+      <right_joint>joint_rueda_der_del</right_joint>
+      <right_joint>joint_rueda_der_tra</right_joint>
+      <wheel_separation>${separacion_ruedas}</wheel_separation>
+      <wheel_radius>${rueda_radio}</wheel_radius>
+      <odom_publish_frequency>30</odom_publish_frequency>
+      <topic>cmd_vel</topic>
+      <odom_topic>odom</odom_topic>
+      <frame_id>odom</frame_id>
+      <child_frame_id>base_footprint</child_frame_id>
+  </plugin>
+  </gazebo>
+
+<link name="lidar_link">
+  <visual>
+    <geometry><cylinder radius="0.0189" length="0.033"/></geometry>
+    <material name="negro"><color rgba="0.1 0.1 0.1 1"/></material>
+  </visual>
+  <collision><geometry><cylinder radius="0.0189" length="0.033"/></geometry></collision>
+  <inertial><mass value="0.04"/><inertia ixx="0.0000072" ixy="0" ixz="0" iyy="0.0000072" iyz="0" izz="0.0000071"/></inertial>
+</link>
+<joint name="joint_lidar" type="fixed">
+  <parent link="base_link"/>
+  <child link="lidar_link"/>
+  <origin xyz="0.013 0 0.079" rpy="0 0 0"/>
+</joint>
+
+<link name="camera_link">
+  <visual>
+    <geometry><box size="0.014 0.048 0.032"/></geometry>
+    <material name="negro"><color rgba="0.1 0.1 0.1 1"/></material>
+  </visual>
+  <collision><geometry><box size="0.017 0.048 0.032"/></geometry></collision>
+  <inertial><mass value="0.0186"/><inertia ixx="0.0000052" ixy="0" ixz="0" iyy="0.0000019" iyz="0" izz="0.0000039"/></inertial>
+</link>
+<joint name="joint_camera" type="fixed">
+  <parent link="base_link"/>
+  <child link="camera_link"/>
+  <origin xyz="0.088 0 0.04" rpy="0 0 0"/>  <!-- 0.0225 (techo del chasis) + 0.016 (mitad de los 32 mm de la cámara) + holgura por tilt-->
+</joint>
+
+
+<!-- Antena (solo por el visaje) -->
+<link name="antena_link">
+  <visual>
+    <geometry><cylinder radius="0.004" length="0.08"/></geometry>
+    <material name="negro"><color rgba="0.1 0.1 0.1 1"/></material>
+  </visual>
+  <inertial><mass value="0.01"/><inertia ixx="0.00001" ixy="0" ixz="0" iyy="0.00001" iyz="0" izz="0.00001"/></inertial>
+</link>
+<joint name="joint_antena" type="fixed">
+  <parent link="base_link"/>
+  <child link="antena_link"/>
+  <origin xyz="-0.09 -0.045 0.03" rpy="0 0 0"/>
+</joint>
+
+
+
+  <gazebo reference="lidar_link">
+    <sensor name="lidar" type="gpu_lidar">
+      <gz_frame_id>lidar_link</gz_frame_id> <!-- sin esto el frame_id sería "lidar" -->
+      <topic>scan</topic>
+      <update_rate>10</update_rate>
+      <lidar>
+        <scan>
+          <horizontal>
+            <samples>450</samples>
+            <min_angle>-3.14159</min_angle>
+            <max_angle>3.14159</max_angle>
+          </horizontal>
+        </scan>
+        <range>
+          <min>0.03</min>
+          <max>12.0</max>
+        </range>
+        <noise> <!-- Agregamos porque la ds menciona precisión de ±4 mm hasta 2 m y ±15 mm de 2 a 12 m.-->
+          <type>gaussian</type>
+          <mean>0.0</mean>
+          <stddev>0.01</stddev>
+        </noise>
+      </lidar>
+    </sensor>
+  </gazebo>
+
+  <gazebo reference="camera_link">
+    <sensor name="camara" type="camera">
+      <gz_frame_id>camera_link</gz_frame_id> <!-- también lo agregamos para que el frame_id que publica el sensor sea "camera_link" y no "camara" -->
+      <topic>image_raw</topic>
+      <update_rate>15</update_rate>
+      <camera>
+        <horizontal_fov>1.047</horizontal_fov>
+        <image><width>640</width><height>480</height></image>
+        <clip><near>0.1</near><far>20</far></clip>
+        <noise>
+          <type>gaussian</type>
+          <mean>0.0</mean>
+          <stddev>0.007</stddev>
+        </noise>
+      </camera>
+    </sensor>
+  </gazebo>
+
+  <gazebo>
+    <plugin filename="gz-sim-joint-state-publisher-system" name="gz::sim::systems::JointStatePublisher">
+      <topic>joint_states</topic>
+    </plugin>
+  </gazebo>
+
+  
+
+
+</robot>
