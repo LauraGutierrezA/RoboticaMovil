@@ -24,11 +24,15 @@ if(BUILD_TESTING)
 endif()
 
 
-install(DIRECTORY urdf worlds config launch
+install(DIRECTORY urdf worlds config launch meshes
   DESTINATION share/${PROJECT_NAME}
 )
 
-install(PROGRAMS scripts/odometria_llantas.py
+install(PROGRAMS
+  scripts/odometria_llantas.py
+  scripts/odometria_vueltas.py
+  scripts/detector_vueltas.py
+  scripts/aeb_mux.py
   DESTINATION lib/${PROJECT_NAME})
 
 

@@ -1,0 +1,52 @@
+<?xml version="1.0"?>
+<sdf version="1.9">
+  <world name="pista_competencia">
+    <physics name="1ms" type="ignored">
+      <max_step_size>0.001</max_step_size>
+      <real_time_factor>1.0</real_time_factor>
+      <!-- Bullet en vez de ODE para detectar colisiones: ODE es inestable con mallas de
+           triángulos (STL de las pistas) y puede "lanzar" el robot al rozar un muro.
+           Si Bullet no está instalado, Gazebo avisa y vuelve a ODE. -->
+      <dart><collision_detector>bullet</collision_detector></dart>
+    </physics>
+    <plugin filename="gz-sim-physics-system" name="gz::sim::systems::Physics"/>
+    <plugin filename="gz-sim-scene-broadcaster-system" name="gz::sim::systems::SceneBroadcaster"/>
+    <plugin filename="gz-sim-sensors-system" name="gz::sim::systems::Sensors">
+      <render_engine>ogre2</render_engine>
+    </plugin>
+    <plugin filename="gz-sim-user-commands-system" name="gz::sim::systems::UserCommands"/>
+
+    <light type="directional" name="sol">
+      <pose>0 0 10 0 0 0</pose>
+      <direction>0.3 0.3 -1</direction>
+    </light>
+
+    <model name="piso">
+      <static>true</static>
+      <link name="link">
+        <collision name="col">
+          <geometry><plane><normal>0 0 1</normal><size>40 40</size></plane></geometry>
+        </collision>
+        <visual name="vis">
+          <geometry><plane><normal>0 0 1</normal><size>40 40</size></plane></geometry>
+          <material><ambient>0.5 0.5 0.5 1</ambient><diffuse>0.5 0.5 0.5 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+
+    <!-- Pista de competencia: muros de 25 cm sobre el piso, 16.1 x 6 m, carril ~0.85 m
+         Spawn: x=-0.60 y=0 z=0.1 yaw=0 (reporte: detrás de la línea de salida/meta x=0, sentido antihorario) -->
+    <model name="pista_competencia">
+      <static>true</static>
+      <link name="link">
+        <collision name="col">
+          <geometry><mesh><uri>model://mi_robot_diferencial/meshes/pistas/pista_competencia.stl</uri></mesh></geometry>
+        </collision>
+        <visual name="vis">
+          <geometry><mesh><uri>model://mi_robot_diferencial/meshes/pistas/pista_competencia.stl</uri></mesh></geometry>
+          <material><ambient>0.9 0.9 0.9 1</ambient><diffuse>0.9 0.9 0.9 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+  </world>
+</sdf>

@@ -45,3 +45,10 @@
   ros_type_name: "rosgraph_msgs/msg/Clock"
   gz_type_name: "gz.msgs.Clock"
   direction: GZ_TO_ROS
+
+# Pose real (ground truth) del OdometryPublisher: solo para medir error de cierre y vueltas
+- ros_topic_name: "/ground_truth"
+  gz_topic_name: "/ground_truth"
+  ros_type_name: "nav_msgs/msg/Odometry"
+  gz_type_name: "gz.msgs.Odometry"
+  direction: GZ_TO_ROS
