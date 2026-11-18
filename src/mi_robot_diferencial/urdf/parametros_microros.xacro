@@ -1,0 +1,73 @@
+<?xml version="1.0"?>
+<!-- ======================================================================
+     Parámetros del Yahboom MicroROS (tabla 3.1 "Robot y límites" del reporte).
+     Única fuente de verdad: robotYahboom.urdf.xacro y robotPro.urdf.xacro
+     incluyen este archivo, así que cualquier cambio aquí aplica a los dos.
+     ====================================================================== -->
+<robot xmlns:xacro="http://www.ros.org/wiki/xacro">
+
+  <!-- ===== Geometría de las ruedas =====
+       La tabla marca estos valores con "≈" (estimados del plano) y pide verificarlos.
+       Se usan los del CAD oficial de Yahboom (yahboomcar_description/MicroROS.urdf):
+       con ellos el modelo reproduce las medidas exactas de la tabla
+       (ancho 153 mm = 131.5 + 21.5; alto 124.2 mm hasta la tapa del LiDAR),
+       mientras que con la vía ≈134 mm el ancho daría 155.5 mm.
+         Tabla (≈)  |  CAD (usado)
+         Ø 49 mm    |  Ø 48 mm
+         vía 134 mm |  131.5 mm
+         ejes 96 mm |  95 mm
+       Para usar los valores de la tabla basta cambiar las tres líneas. -->
+  <xacro:property name="rueda_radio"       value="0.024"/>    <!-- tabla: ≈0.0245 -->
+  <xacro:property name="rueda_ancho"       value="0.0215"/>
+  <xacro:property name="separacion_ruedas" value="0.1315"/>   <!-- tabla: ≈0.134  -->
+  <xacro:property name="distancia_ejes"    value="0.095"/>    <!-- tabla: ≈0.096  -->
+
+  <!-- ===== Masa: total 0.906 kg =====
+       ruedas 4 x 0.05 + LiDAR MS200 0.04 (datasheet) + cámara 0.0186 + antena 0.01
+       = 0.2686 kg  ->  chasis = 0.906 - 0.2686 = 0.6374 kg (incluye motores y batería) -->
+  <xacro:property name="masa_total"   value="0.906"/>
+  <xacro:property name="masa_rueda"   value="0.05"/>
+  <xacro:property name="masa_lidar"   value="0.04"/>
+  <xacro:property name="masa_camara"  value="0.0186"/>
+  <xacro:property name="masa_antena"  value="0.01"/>
+  <xacro:property name="masa_chasis"
+      value="${masa_total - 4*masa_rueda - masa_lidar - masa_camara - masa_antena}"/>
+
+  <!-- ===== Límites del plugin DiffDrive =====
+       v_max = 1.0 m/s, por debajo de la velocidad en vacío: 450 rpm · π · 0.049 m / 60 ≈ 1.15 m/s -->
+  <xacro:property name="v_max"     value="1.0"/>   <!-- m/s   -->
+  <xacro:property name="w_max"     value="4.0"/>   <!-- rad/s -->
+  <xacro:property name="a_lin_max" value="2.0"/>   <!-- m/s²  -->
+
+  <!-- ===== LiDAR MS200 =====
+       Altura de montaje ≈108 mm sobre el piso (plano de escaneo). -->
+  <xacro:property name="lidar_altura" value="0.108"/>
+
+  <!-- Altura de base_link sobre el piso (las ruedas están 0.01 m por debajo del centro del chasis) -->
+  <xacro:property name="base_altura" value="${rueda_radio + 0.01}"/>
+
+  <!-- Inercia de un cilindro macizo (rueda), eje de giro = z del link -->
+  <xacro:macro name="inercia_rueda">
+    <inertia ixx="${masa_rueda*(3*rueda_radio**2 + rueda_ancho**2)/12}" ixy="0" ixz="0"
+             iyy="${masa_rueda*(3*rueda_radio**2 + rueda_ancho**2)/12}" iyz="0"
+             izz="${masa_rueda*rueda_radio**2/2}"/>
+  </xacro:macro>
+
+  <!-- Inercia de una caja maciza de masa m y lados x, y, z -->
+  <xacro:macro name="inercia_caja" params="m x y z">
+    <inertia ixx="${m*(y*y + z*z)/12}" ixy="0" ixz="0"
+             iyy="${m*(x*x + z*z)/12}" iyz="0"
+             izz="${m*(x*x + y*y)/12}"/>
+  </xacro:macro>
+
+  <!-- Límites en el DiffDrive (nombres verificados en gz-sim 8 / Harmonic, DiffDrive.hh) -->
+  <xacro:macro name="limites_diffdrive">
+    <max_linear_velocity>${v_max}</max_linear_velocity>
+    <min_linear_velocity>${-v_max}</min_linear_velocity>
+    <max_angular_velocity>${w_max}</max_angular_velocity>
+    <min_angular_velocity>${-w_max}</min_angular_velocity>
+    <max_linear_acceleration>${a_lin_max}</max_linear_acceleration>
+    <min_linear_acceleration>${-a_lin_max}</min_linear_acceleration>
+  </xacro:macro>
+
+</robot>
