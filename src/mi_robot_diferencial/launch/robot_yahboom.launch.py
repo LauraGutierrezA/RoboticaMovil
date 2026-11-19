@@ -10,6 +10,8 @@ Lanza la simulación con el robot y la pista que se elijan.
 Los comandos pasan siempre por aeb_mux.py (mux + frenado de emergencia) antes de llegar a /cmd_vel.
 Teleoperación, en otra terminal:
   ros2 run teleop_twist_keyboard teleop_twist_keyboard --ros-args -r cmd_vel:=cmd_vel_teleop
+o con el celular como volante (abre https://<IP del PC>:8443 en el celular):
+  ros2 launch mi_robot_diferencial robot_yahboom.launch.py volante:=true
 
 Para agregar otra pista: poner el .sdf en worlds/ y una línea en PISTAS.
 """
@@ -59,7 +61,13 @@ def lanzar(context):
     # El URDF generado por xacro se pasa como string, no como YAML
     robot_description = ParameterValue(Command(['xacro ', xacro_path]), value_type=str)
 
-    return [
+    nodos = []
+    if LaunchConfiguration('volante').perform(context) == 'true':
+        # El celular como volante -> /cmd_vel_teleop (pasa por el AEB igual que el teclado)
+        nodos.append(Node(package='mi_robot_diferencial', executable='volante_web.py',
+                          output='screen'))
+
+    return nodos + [
         # Gazebo con la pista, arrancando sin pausa (-r)
         ExecuteProcess(cmd=['gz', 'sim', '-r', '-v4', world_path], output='screen'),
         Node(
@@ -106,6 +114,8 @@ def generate_launch_description():
                               description='Modelo del robot: ' + ', '.join(ROBOTS)),
         DeclareLaunchArgument('modo', default_value='teleop', choices=['teleop', 'auto'],
                               description='teleop: /cmd_vel_teleop pasa al robot; auto: /cmd_vel_auto'),
+        DeclareLaunchArgument('volante', default_value='false', choices=['true', 'false'],
+                              description='true: lanza volante_web.py (el celular como volante)'),
         DeclareLaunchArgument('vueltas', default_value='3',
                               description='Vueltas tras las que detector_vueltas guarda resultados'),
         DeclareLaunchArgument('carpeta_salida', default_value='~/resultados_vueltas',
