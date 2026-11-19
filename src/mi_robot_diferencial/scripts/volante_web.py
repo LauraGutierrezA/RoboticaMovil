@@ -136,6 +136,7 @@ class NodoVolanteWeb(Node):
         dp('muestreo_odom', 5.0)         # [Hz] puntos de la gráfica de odometría
         dp('b_ruedas', 0.1315)           # [m] vía geométrica (para sugerir b_ef = b/k)
         dp('carpeta_cert', '~/.volante_web')
+        dp('aviso_url_s', 10.0)          # [s] reimprimir la URL al final del arranque (0 = no)
         dp('cam_topico', '/image_raw')
         dp('cam_fps', 15.0)              # [Hz] tope de cuadros enviados al celular
         dp('cam_calidad', 70)            # calidad JPEG (0-100)
@@ -199,9 +200,20 @@ class NodoVolanteWeb(Node):
         ctx.load_cert_chain(cert, key)
         self.servidor.socket = ctx.wrap_socket(self.servidor.socket, server_side=True)
         threading.Thread(target=self.servidor.serve_forever, daemon=True).start()
+        self.url = f"https://{ip_local()}:{gp('puerto')}"
         self.get_logger().info(
-            f"Consola lista → abrir en el celular: https://{ip_local()}:{gp('puerto')}  "
+            f"Consola lista → abrir en el celular: {self.url}  "
             f"(publica en {gp('topico')} solo desde la pestaña Operación)")
+        # El launch arranca este nodo de primero y el mensaje se pierde entre el log de Gazebo:
+        # se repite cuando todo lo demás ya arrancó (timer de una sola vez, en tiempo de reloj).
+        if gp('aviso_url_s') > 0.0:
+            self.t_url = self.create_timer(gp('aviso_url_s'), self.repetir_url)
+
+    def repetir_url(self):
+        self.t_url.cancel()
+        linea = f'  CONSOLA WEB → abre en el celular:  {self.url}  '
+        borde = '═' * len(linea)
+        self.get_logger().info(f'\n╔{borde}╗\n║{linea}║\n║{"  (misma red WiFi; acepta la advertencia del certificado)".ljust(len(linea))}║\n╚{borde}╝')
 
     # ================================================================ volante
     def calcular(self, d):
