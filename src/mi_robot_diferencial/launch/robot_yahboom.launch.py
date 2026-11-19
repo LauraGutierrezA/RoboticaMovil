@@ -4,6 +4,7 @@ Lanza la simulación con el robot y la pista que se elijan.
   ros2 launch mi_robot_diferencial robot_yahboom.launch.py                      # pista_pro (por defecto)
   ros2 launch mi_robot_diferencial robot_yahboom.launch.py pista:=rainbow
   ros2 launch mi_robot_diferencial robot_yahboom.launch.py pista:=competencia
+  ros2 launch mi_robot_diferencial robot_yahboom.launch.py pista:=rr_wide        # también rr_og, rr_noisland
   ros2 launch mi_robot_diferencial robot_yahboom.launch.py robot:=pro          # robot de cajas original (por defecto: microros)
   ros2 launch mi_robot_diferencial robot_yahboom.launch.py modo:=auto          # obedece /cmd_vel_auto
   ros2 launch mi_robot_diferencial robot_yahboom.launch.py modo:=auto algoritmo:=ninguno   # auto sin controlador
@@ -40,6 +41,13 @@ PISTAS = {
                     linea=(-2.00, 4.30, 0.0, 0.45)),                            # donde empieza la franja roja
     'competencia': dict(mundo='pista_competencia.sdf', spawn=(-0.60, 0.00, 0.10, 0.0),  # reporte: detrás de x=0
                         linea=(0.0, 0.0, 0.0, 0.6)),                            # reporte: línea en x=0, antihorario
+    # Variantes de Rainbow Road (mismo trazado horario, mismo spawn y línea; cambia la parte de abajo)
+    'rr_og': dict(mundo='rr_og.sdf', spawn=(-2.60, 4.30, 0.15, 0.0),            # isla original + chaflán
+                  linea=(-2.00, 4.30, 0.0, 0.45)),
+    'rr_wide': dict(mundo='rr_wide.sdf', spawn=(-2.60, 4.30, 0.15, 0.0),        # isla con ramales anchos + chaflán
+                    linea=(-2.00, 4.30, 0.0, 0.45)),
+    'rr_noisland': dict(mundo='rr_noisland.sdf', spawn=(-2.60, 4.30, 0.15, 0.0),  # sin isla + chaflán
+                        linea=(-2.00, 4.30, 0.0, 0.45)),
 }
 # Por robot: xacro y huella vista desde el LiDAR para el AEB (frente, atrás, semiancho) [m]
 ROBOTS = {

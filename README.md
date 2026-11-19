@@ -382,6 +382,9 @@ ros2 launch mi_robot_diferencial robot_yahboom.launch.py robot:=pro          # r
 | `pro` (defecto) | `pista_pro.sdf`, el "8" con puente | (−1.06, 1.06, 0.10, −0.785) |
 | `rainbow` | `rainbow_road.sdf`: vía de 5 cm con muros de 20 cm, 9.65 × 9.7 m, con franjas arcoíris de 25 cm (`scripts/generar_rainbow.py`) | (−2.60, 4.30, 0.15, 0) |
 | `competencia` | `pista_competencia.sdf`: muros de 25 cm, 16.1 × 6 m | (−0.60, 0, 0.10, 0) |
+| `rr_og` | `rr_og.sdf`: Rainbow Road con la isla original y chaflán a la entrada del corredor inferior | (−2.60, 4.30, 0.15, 0) |
+| `rr_wide` | `rr_wide.sdf`: Rainbow Road con los ramales de la isla ensanchados (0.52 / 0.44 m) y chaflán | (−2.60, 4.30, 0.15, 0) |
+| `rr_noisland` | `rr_noisland.sdf`: Rainbow Road sin isla (rellena con vía) y chaflán | (−2.60, 4.30, 0.15, 0) |
 
 Las mallas de las pistas están en `meshes/pistas/` (en metros; el STL original de Rainbow Road venía en mm). Para agregar otra pista se pone su `.sdf` en `worlds/` y una línea en el diccionario `PISTAS` del launch.
 
