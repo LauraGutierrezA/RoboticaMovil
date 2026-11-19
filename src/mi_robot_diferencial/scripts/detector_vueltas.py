@@ -22,6 +22,7 @@ Cómo detecta un cruce, con la pose REAL (/ground_truth, del motor de física de
 
 En cada cruce compara, en ESE MISMO instante de simulación, la pose real con:
   - /odom_llantas : odometría propia (odometria_vueltas.py, ω_I y ω_D promediados)
+  - /odom_skid    : la misma con la vía efectiva b_ef (corrección del deslizamiento skid-steer)
   - /odom         : odometría del plugin DiffDrive, llevada al marco del mundo con la pose
                     real inicial (las dos asumen rodadura sin deslizamiento)
 
@@ -106,7 +107,7 @@ class DetectorVueltas:
         self.semiancho = semiancho
         self.t_min = t_min_vuelta
         self.real = Historial()
-        self.est = {'llantas': Historial(), 'diffdrive': Historial()}
+        self.est = {'llantas': Historial(), 'diffdrive': Historial(), 'skid': Historial()}
         self.dist = [0.0]                       # distancia real recorrida, alineada con self.real
         self.pose0 = None                       # pose real inicial (marco del /odom del DiffDrive)
         self.cruces = []                        # dicts ya resueltos
@@ -221,8 +222,12 @@ def guardar_resultados(det, carpeta, nombre_pista, log=print):
     except ImportError:
         log('matplotlib no disponible: solo se guardaron los CSV')
         return
-    col = {'llantas': 'tab:red', 'diffdrive': 'tab:blue'}
-    nom = {'llantas': 'Odometría propia (ω_I, ω_D)', 'diffdrive': 'Odometría DiffDrive (/odom)'}
+    fuentes = [f for f in fuentes if det.est[f].t]           # solo las que publicaron
+    col = {'llantas': 'tab:red', 'diffdrive': 'tab:blue', 'skid': 'tab:green'}
+    nom = {'llantas': 'Odometría propia (ω_I, ω_D)', 'diffdrive': 'Odometría DiffDrive (/odom)',
+           'skid': 'Propia corregida skid-steer (b_ef)'}
+    estilo = {'llantas': dict(ls='-', lw=3.0, alpha=0.6), 'diffdrive': dict(ls='--', lw=1.2, alpha=1.0),
+              'skid': dict(ls='-', lw=1.8, alpha=1.0)}
     n_v = det.vueltas_completas()
 
     fig, ax = plt.subplots(figsize=(9, 7))
@@ -230,8 +235,7 @@ def guardar_resultados(det, carpeta, nombre_pista, log=print):
     for fu in fuentes:
         h = det.est[fu]
         if h.t:
-            ax.plot(h.x, h.y, '-' if fu == 'llantas' else '--', color=col[fu],
-                    lw=3.0 if fu == 'llantas' else 1.2, alpha=0.7 if fu == 'llantas' else 1.0, label=nom[fu])
+            ax.plot(h.x, h.y, color=col[fu], label=nom[fu], **estilo[fu])
     L = det.semiancho
     ax.plot([det.p0[0] - L * det.n[0], det.p0[0] + L * det.n[0]],
             [det.p0[1] - L * det.n[1], det.p0[1] + L * det.n[1]], 'g-', lw=4, label='Línea de salida/meta')
@@ -248,9 +252,11 @@ def guardar_resultados(det, carpeta, nombre_pista, log=print):
     if filas:
         fig, ax = plt.subplots(figsize=(10, 4.5))
         d = [f[1] for f in filas]
-        for j, fu in enumerate(fuentes):
-            ax.plot(d, [f[5 + 4 * j + 3] * 1000 for f in filas], color=col[fu], label=nom[fu],
-                    lw=3.0 if fu == 'llantas' else 1.2, alpha=0.7 if fu == 'llantas' else 1.0)
+        todas = list(det.est)
+        for fu in fuentes:
+            jj = todas.index(fu)                               # columna de esa fuente en `filas`
+            ax.plot(d, [f[5 + 4 * jj + 3] * 1000 for f in filas], color=col[fu], label=nom[fu],
+                    **estilo[fu])
         for c in det.cruces:
             ax.axvline(c['dist'], color='g', ls=':', lw=1)
             ax.text(c['dist'], ax.get_ylim()[1] * 0.95, 'salida' if c['k'] == 0 else f"V{c['k']}",
@@ -266,9 +272,9 @@ def guardar_resultados(det, carpeta, nombre_pista, log=print):
         k = [c['k'] for c in vueltas]
         for j, fu in enumerate(fuentes):
             off = (j - (len(fuentes) - 1) / 2) * 0.35
-            a1.bar([x + off for x in k], [c['err_' + fu][0] * 1000 for c in vueltas], 0.35,
+            a1.bar([x + off for x in k], [c['err_' + fu][0] * 1000 for c in vueltas], 0.3,
                    color=col[fu], label=nom[fu])
-            a2.bar([x + off for x in k], [math.degrees(c['err_' + fu][1]) for c in vueltas], 0.35,
+            a2.bar([x + off for x in k], [math.degrees(c['err_' + fu][1]) for c in vueltas], 0.3,
                    color=col[fu])
         a1.set_title('Error de cierre de posición'); a1.set_ylabel('[mm]')
         a2.set_title('Error de cierre de orientación'); a2.set_ylabel('[°]')
@@ -280,14 +286,15 @@ def guardar_resultados(det, carpeta, nombre_pista, log=print):
 
 def tabla_resumen(det):
     lineas = ['', '  Cruce | t vuelta [s] | t total [s] | dist [m] | e_pos propia [mm] | e_ψ propia [°]'
-              ' | e_pos DiffDrive [mm] | e_ψ DiffDrive [°]',
-              ' ' + '-' * 118]
+              ' | e_pos DiffDrive [mm] | e_ψ DiffDrive [°] | e_pos skid [mm] | e_ψ skid [°]',
+              ' ' + '-' * 150]
     for c in det.cruces:
-        el, ed = c['err_llantas'], c['err_diffdrive']
-        lineas.append(' %6s | %12s | %11.3f | %8.2f | %17.2f | %14.3f | %20.2f | %17.3f' % (
+        el, ed, es = c['err_llantas'], c['err_diffdrive'], c['err_skid']
+        lineas.append(' %6s | %12s | %11.3f | %8.2f | %17.2f | %14.3f | %20.2f | %17.3f | %15.2f | %12.3f' % (
             'salida' if c['k'] == 0 else f"V{c['k']}",
             '-' if c['k'] == 0 else f"{c['t_vuelta']:.3f}", c['t_total'], c['dist'],
-            el[0] * 1000, math.degrees(el[1]), ed[0] * 1000, math.degrees(ed[1])))
+            el[0] * 1000, math.degrees(el[1]), ed[0] * 1000, math.degrees(ed[1]),
+            es[0] * 1000, math.degrees(es[1])))
     return '\n'.join(lineas)
 
 
@@ -318,6 +325,7 @@ class NodoDetectorVueltas(Node):
         self.create_subscription(Odometry, '/ground_truth', self.cb_real, qos)
         self.create_subscription(Odometry, '/odom_llantas', lambda m: self.cb_est('llantas', m), qos)
         self.create_subscription(Odometry, '/odom', lambda m: self.cb_est('diffdrive', m), qos)
+        self.create_subscription(Odometry, '/odom_skid', lambda m: self.cb_est('skid', m), qos)
         self.pub = self.create_publisher(Int32, '/vuelta', 10)
         self.create_timer(0.2, self.cb_timer)
         self.get_logger().info(
@@ -341,13 +349,14 @@ class NodoDetectorVueltas(Node):
         t_ahora = self.det.real.ultimo_t()
         forzar = forzar or (self.det.pendientes and t_ahora - self.det.pendientes[0]['t'] > 1.0)
         for c in self.det.resolver(forzar=forzar):
-            el = c['err_llantas']
+            el, es = c['err_llantas'], c['err_skid']
             if c['k'] == 0:
                 self.get_logger().info(f"SALIDA en t = {c['t']:.3f} s (sim). Cronómetro en marcha.")
             else:
                 self.get_logger().info(
                     f"VUELTA {c['k']}: {c['t_vuelta']:.3f} s | total {c['t_total']:.3f} s | "
-                    f"error de cierre (propia) {el[0] * 1000:.1f} mm, {math.degrees(el[1]):.2f}°")
+                    f"error de cierre propia {el[0] * 1000:.1f} mm, {math.degrees(el[1]):.2f}° | "
+                    f"corregida skid {es[0] * 1000:.1f} mm, {math.degrees(es[1]):.2f}°")
             self.pub.publish(Int32(data=c['k']))
             if c['k'] == self.n_vueltas:
                 self.guardar(f'{self.n_vueltas} vueltas completas')

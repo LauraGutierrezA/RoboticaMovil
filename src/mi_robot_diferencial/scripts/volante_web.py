@@ -134,6 +134,7 @@ class NodoVolanteWeb(Node):
         dp('timeout', 0.3)               # [s] sin datos del celular → cero
         dp('frecuencia', 20.0)           # [Hz]
         dp('muestreo_odom', 5.0)         # [Hz] puntos de la gráfica de odometría
+        dp('b_ruedas', 0.1315)           # [m] vía geométrica (para sugerir b_ef = b/k)
         dp('carpeta_cert', '~/.volante_web')
         dp('cam_topico', '/image_raw')
         dp('cam_fps', 15.0)              # [Hz] tope de cuadros enviados al celular
@@ -153,7 +154,12 @@ class NodoVolanteWeb(Node):
         self.gt_hist = deque(maxlen=200)          # (t, x, y, psi) para interpolar
         self.dist = 0.0
         self.pose0_dd = None                      # pose real cuando /odom era (0,0,0)
-        self.dd = self.ll = None                  # última pose de /odom (mundo) y /odom_llantas
+        self.dd = self.ll = self.sk = None        # última pose de /odom (mundo), /odom_llantas, /odom_skid
+        self.err_prev = {}                        # para "desenvolver" el error de orientación
+        self.w_gt = 0.0                           # ω real (/ground_truth)
+        self.sxy = self.sxx = 0.0                 # mínimos cuadrados ω_real ≈ k·ω_ruedas
+        self.n_k = 0
+        self.b_ruedas = gp('b_ruedas')
         self.v_odom = 0.0
         self.t_ult_muestra = -math.inf
         self.odom_pts, self.odom_base = [], 0     # puntos de la gráfica (con índice absoluto)
@@ -175,6 +181,7 @@ class NodoVolanteWeb(Node):
         self.create_subscription(Odometry, '/ground_truth', self.cb_gt, sd)
         self.create_subscription(Odometry, '/odom', self.cb_dd, sd)
         self.create_subscription(Odometry, '/odom_llantas', self.cb_ll, sd)
+        self.create_subscription(Odometry, '/odom_skid', self.cb_sk, sd)
         self.create_subscription(Bool, '/aeb/activo', self.cb_aeb, 10)
         self.create_subscription(Float64, '/aeb/ttc_min', self.cb_ttc, 10)
         self.create_subscription(Int32, '/vuelta', self.cb_vuelta, 10)
@@ -251,10 +258,15 @@ class NodoVolanteWeb(Node):
             self.dist += math.hypot(x - self.gt_hist[-1][1], y - self.gt_hist[-1][2])
         if not self.gt_hist or t > self.gt_hist[-1][0]:
             self.gt_hist.append((t, x, y, psi))
+        self.w_gt = m.twist.twist.angular.z
 
     def cb_ll(self, m):
         p = m.pose.pose
         self.ll = (p.position.x, p.position.y, yaw_de_quat(p.orientation))
+
+    def cb_sk(self, m):
+        p = m.pose.pose
+        self.sk = (p.position.x, p.position.y, yaw_de_quat(p.orientation))
 
     def cb_dd(self, m):
         t, p, tw = stamp_s(m.header), m.pose.pose, m.twist.twist
@@ -277,19 +289,30 @@ class NodoVolanteWeb(Node):
             return
         self.t_ult_muestra = t
 
-        def err(est):
+        # k en vivo: ω_real ≈ k·ω_ruedas (ω de /odom = a(ωD−ωI)/b, sin deslizamiento)
+        if abs(tw.angular.z) > 0.2:
+            self.sxy += self.w_gt * tw.angular.z
+            self.sxx += tw.angular.z ** 2
+            self.n_k += 1
+
+        def err(clave, est):
             if est is None:
                 return None, None
-            return (round(math.hypot(est[0] - real[0], est[1] - real[1]) * 1000, 1),
-                    round(math.degrees(envolver(est[2] - real[2])), 2))
-        e_ll, s_ll = err(self.ll)
-        e_dd, s_dd = err(dd)
+            # orientación "desenvuelta": sigue creciendo más allá de ±180° (sin saltos)
+            crudo = math.degrees(envolver(est[2] - real[2]))
+            prev = self.err_prev.get(clave, crudo)
+            psi_e = prev + math.degrees(envolver(math.radians(crudo - prev)))
+            self.err_prev[clave] = psi_e
+            return (round(math.hypot(est[0] - real[0], est[1] - real[1]) * 1000, 1), round(psi_e, 2))
+        e_ll, s_ll = err('l', self.ll)
+        e_dd, s_dd = err('d', dd)
+        e_sk, s_sk = err('k', self.sk)
+        r3 = lambda p, i: round(p[i], 3) if p else None  # noqa: E731
         pt = dict(t=round(t, 2), d=round(self.dist, 3),
                   xr=round(real[0], 3), yr=round(real[1], 3),
-                  xl=round(self.ll[0], 3) if self.ll else None,
-                  yl=round(self.ll[1], 3) if self.ll else None,
-                  xd=round(dd[0], 3), yd=round(dd[1], 3),
-                  el=e_ll, sl=s_ll, ed=e_dd, sd=s_dd)
+                  xl=r3(self.ll, 0), yl=r3(self.ll, 1), xd=round(dd[0], 3), yd=round(dd[1], 3),
+                  xk=r3(self.sk, 0), yk=r3(self.sk, 1),
+                  el=e_ll, sl=s_ll, ed=e_dd, sd=s_dd, ek=e_sk, sk=s_sk)
         with self.lock:
             self.odom_pts.append(pt)
             if len(self.odom_pts) > 6000:                     # 20 min a 5 Hz
@@ -444,6 +467,8 @@ class NodoVolanteWeb(Node):
             v_odom=round(self.v_odom, 2), dist=round(self.dist, 2),
             aeb=self.aeb_activo, aeb_cuenta=self.aeb_cuenta, ttc=num(self.ttc),
             vueltas=vueltas, wall_ok=self.pc_wall.services_are_ready(),
+            k=num(self.sxy / self.sxx) if self.sxx > 0 else None, n_k=self.n_k,
+            b_ef=num(self.b_ruedas * self.sxx / self.sxy) if self.sxy > 0 else None,
             odom=od, n_odom=n_od, wall=wl, n_wall=n_wl,
             reinicio_odom=desde_odom > n_od, reinicio_wall=desde_wall > n_wl)
 
@@ -455,6 +480,7 @@ class NodoVolanteWeb(Node):
             self.wall_pts = []
             self.aeb_cuenta = 0
             self.dist = 0.0
+            self.err_prev = {}
 
     # ================================================================ servidor web
     def handler(self):
@@ -705,15 +731,15 @@ input[type=range]::-moz-range-thumb{width:22px;height:22px;border-radius:50%;bac
 
 /* ---------- 3 Odometría y 4 Wall ---------- */
 #v-odo,#v-wall{overflow:auto;gap:10px;align-content:start}
-#v-odo{grid-template-columns:repeat(5,minmax(0,1fr))}
+#v-odo{grid-template-columns:repeat(6,minmax(0,1fr))}
 .kpi{padding:10px 12px;display:flex;flex-direction:column;gap:3px}
-.kpi .n{font:700 1.25rem var(--mono);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.kpi .n{font:700 1.15rem var(--mono);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .kpi .u{font:.7rem var(--mono);color:var(--mut)}
 .graf{padding:10px;display:flex;flex-direction:column;gap:6px}
 .graf canvas{width:100%;height:210px;display:block}
 .leyenda{display:flex;gap:14px;flex-wrap:wrap;font:.7rem var(--mono);color:var(--mut)}
 .leyenda span:before{content:'';display:inline-block;width:14px;height:3px;border-radius:2px;margin-right:5px;vertical-align:middle;background:var(--c)}
-.span2{grid-column:span 2}.span3{grid-column:span 3}.span5{grid-column:1/-1}
+.span2{grid-column:span 2}.span3{grid-column:span 3}.span4{grid-column:span 4}.span5{grid-column:1/-1}
 
 #v-wall{grid-template-columns:minmax(0,1.25fr) minmax(0,1fr)}
 #params{padding:12px;display:flex;flex-direction:column;gap:12px}
@@ -828,18 +854,22 @@ input[type=range]::-moz-range-thumb{width:22px;height:22px;border-radius:50%;bac
   <!-- 4 ODOMETRÍA -->
   <section class="vista" id="v-odo">
     <div class="card kpi"><span class="lbl">Distancia real</span><span class="n" id="k-dist">0.00</span><span class="u">m</span></div>
-    <div class="card kpi"><span class="lbl">Error propia</span><span class="n" id="k-el" style="color:var(--rojo)">—</span><span class="u">mm (ω_I, ω_D)</span></div>
-    <div class="card kpi"><span class="lbl">Error DiffDrive</span><span class="n" id="k-ed" style="color:var(--azul2)">—</span><span class="u">mm (/odom)</span></div>
-    <div class="card kpi"><span class="lbl">Error <span class="g">ψ</span> propia</span><span class="n" id="k-sl">—</span><span class="u">grados</span></div>
-    <div class="card kpi"><span class="lbl">Error <span class="g">ψ</span> DiffDrive</span><span class="n" id="k-sd">—</span><span class="u">grados</span></div>
-    <div class="card graf span3"><div class="lbl">‖error de posición‖ vs distancia recorrida</div><canvas id="g-epos"></canvas>
-      <div class="leyenda"><span style="--c:var(--rojo)">propia (ω_I, ω_D)</span><span style="--c:var(--azul2)">DiffDrive /odom</span></div></div>
+    <div class="card kpi"><span class="lbl">Error propia</span><span class="n" id="k-el" style="color:var(--rojo)">—</span><span class="u" id="k-el-u">= DiffDrive</span></div>
+    <div class="card kpi"><span class="lbl">Error corregida</span><span class="n" id="k-ek" style="color:var(--verde)">—</span><span class="u" id="k-ek-u">skid-steer</span></div>
+    <div class="card kpi"><span class="lbl"><span class="g">ψ</span> propia</span><span class="n" id="k-sl">—</span><span class="u">grados</span></div>
+    <div class="card kpi"><span class="lbl"><span class="g">ψ</span> corregida</span><span class="n" id="k-sk">—</span><span class="u">grados</span></div>
+    <div class="card kpi"><span class="lbl">k en vivo</span><span class="n" id="k-k" style="color:var(--ambar)">—</span><span class="u" id="k-bef">b_ef —</span></div>
+    <div class="card graf span4"><div class="lbl" id="t-epos">‖error de posición‖ vs distancia recorrida</div><canvas id="g-epos"></canvas>
+      <div class="leyenda"><span style="--c:var(--rojo)">propia (ω_I, ω_D)</span><span style="--c:var(--azul2)">DiffDrive /odom (punteada)</span><span style="--c:var(--verde)">corregida skid-steer</span></div></div>
     <div class="card graf span2"><div class="lbl">Trayectoria</div><canvas id="g-xy"></canvas>
-      <div class="leyenda"><span style="--c:#ffffff">real</span><span style="--c:var(--rojo)">propia</span><span style="--c:var(--azul2)">DiffDrive</span></div></div>
-    <div class="card graf span3"><div class="lbl">error de orientación vs distancia</div><canvas id="g-epsi"></canvas>
-      <div class="leyenda"><span style="--c:var(--rojo)">propia</span><span style="--c:var(--azul2)">DiffDrive</span></div></div>
-    <div class="card kpi span2" style="justify-content:center;gap:10px">
-      <div class="nota">La odometría propia arranca en la pose real; /odom se ancla al mundo la primera vez que el robot está quieto. Reiniciar borra las gráficas (no la odometría).</div>
+      <div class="leyenda"><span style="--c:#ffffff">real</span><span style="--c:var(--rojo)">propia</span><span style="--c:var(--verde)">corregida</span></div></div>
+    <div class="card graf span4"><div class="lbl">error de orientación vs distancia [°] (sin saltos en ±180°)</div><canvas id="g-epsi"></canvas>
+      <div class="leyenda"><span style="--c:var(--rojo)">propia</span><span style="--c:var(--azul2)">DiffDrive (punteada)</span><span style="--c:var(--verde)">corregida</span></div></div>
+    <div class="card kpi span2" style="gap:8px">
+      <div class="lbl">Cómo leerlas</div>
+      <div class="nota"><b>Propia</b> y <b>DiffDrive</b> usan la misma cinemática sin deslizamiento: coinciden (la roja queda debajo de la azul).
+        Al girar, el skid-steer <b>desliza</b>: el robot gira solo <b>k</b> veces lo que dicen las ruedas, la orientación estimada se desvía y la posición "se va".
+        La <b>corregida</b> usa la vía efectiva b_ef = b/k (/odom_skid). <b>k en vivo</b> se calcula con /ground_truth mientras manejas.</div>
       <button class="btn" id="reset-odo">Reiniciar gráficas</button></div>
   </section>
 
@@ -1014,9 +1044,9 @@ function chart(cv, series, o = {}){
     c.fillText(Math.abs(yv)>=100?yv.toFixed(0):yv.toFixed(1), 2, yy+3); }
   for (let i=0;i<=4;i++){ const xv = x0+(x1-x0)*i/4; c.fillText(Math.abs(xv)>=100?xv.toFixed(0):xv.toFixed(1), X(xv)-8, H-6); }
   if (o.xl){ c.fillText(o.xl, W-R-c.measureText(o.xl).width, H-B-4); }
-  series.forEach(s => { c.strokeStyle = s.c; c.lineWidth = s.w || 1.8; c.globalAlpha = s.a || 1; c.beginPath(); let m = false;
+  series.forEach(s => { c.strokeStyle = s.c; c.lineWidth = s.w || 1.8; c.globalAlpha = s.a || 1; c.setLineDash(s.dash || []); c.beginPath(); let m = false;
     s.p.forEach(([x,y]) => { if (y===null || !isFinite(y)) { m = false; return; } m ? c.lineTo(X(x),Y(y)) : c.moveTo(X(x),Y(y)); m = true; });
-    c.stroke(); c.globalAlpha = 1; });
+    c.stroke(); c.globalAlpha = 1; c.setLineDash([]); });
 }
 const css = v => getComputedStyle(document.documentElement).getPropertyValue(v).trim();
 
@@ -1059,8 +1089,14 @@ function actualizar(d){
   const u = odom[odom.length-1];
   $('k-dist').textContent = d.dist.toFixed(2);
   const f = (x, n) => x === null || x === undefined ? '—' : (+x).toFixed(n);
-  if (u){ $('k-el').textContent = f(u.el, 0); $('k-ed').textContent = f(u.ed, 0);
-          $('k-sl').textContent = f(u.sl, 1); $('k-sd').textContent = f(u.sd, 1); }
+  const mm = (x, id) => { if (x === null || x === undefined){ $(id).textContent = '—'; return; }
+    $(id).textContent = x >= 1000 ? (x/1000).toFixed(2) + ' m' : x.toFixed(0) + ' mm'; };
+  if (u){ mm(u.el, 'k-el'); mm(u.ek, 'k-ek');
+          $('k-sl').textContent = f(u.sl, 1) + '°'; $('k-sk').textContent = f(u.sk, 1) + '°';
+          $('k-el-u').textContent = u.ed !== null && u.el !== null ? `DiffDrive: ${u.ed >= 1000 ? (u.ed/1000).toFixed(2)+' m' : u.ed.toFixed(0)+' mm'}` : '= DiffDrive';
+          $('k-ek-u').textContent = u.ek === null ? 'sin /odom_skid' : 'skid-steer (b_ef)'; }
+  $('k-k').textContent = d.k === null ? '—' : d.k.toFixed(3);
+  $('k-bef').textContent = d.b_ef === null ? `girando… (${d.n_k})` : `b_ef ≈ ${d.b_ef.toFixed(3)} m`;
   // wall
   $('w-aeb').textContent = d.aeb_cuenta; $('w-v').textContent = d.v_odom.toFixed(2);
   const V = d.vueltas || [];
@@ -1073,10 +1109,17 @@ function actualizar(d){
 }
 function dibujarTodo(){
   if (vista === 'odo'){
-    chart($('g-epos'), [{p: odom.map(q=>[q.d,q.el]), c:css('--rojo'), w:2.4}, {p: odom.map(q=>[q.d,q.ed]), c:css('--azul2')}], {cero:true, xl:'m'});
-    chart($('g-epsi'), [{p: odom.map(q=>[q.d,q.sl]), c:css('--rojo'), w:2.4}, {p: odom.map(q=>[q.d,q.sd]), c:css('--azul2')}], {cero:true, xl:'m'});
-    chart($('g-xy'), [{p: odom.map(q=>[q.xr,q.yr]), c:'#ffffff', w:2.5}, {p: odom.map(q=>[q.xl,q.yl]), c:css('--rojo'), a:.8},
-                      {p: odom.map(q=>[q.xd,q.yd]), c:css('--azul2'), a:.8}], {igual:true});
+    // error de posición: en mm, o en m si pasa de 2 m
+    const mx = Math.max(0, ...odom.map(q => Math.max(q.el ?? 0, q.ed ?? 0, q.ek ?? 0)));
+    const fe = mx > 2000 ? 0.001 : 1, un = mx > 2000 ? 'm' : 'mm';
+    $('t-epos').textContent = `‖error de posición‖ [${un}] vs distancia recorrida`;
+    const E = k => odom.map(q => [q.d, q[k] === null ? null : q[k]*fe]);
+    chart($('g-epos'), [{p: E('el'), c:css('--rojo'), w:4, a:.55}, {p: E('ed'), c:css('--azul2'), w:1.6, dash:[6,5]},
+                        {p: E('ek'), c:css('--verde'), w:2.2}], {cero:true, xl:'m'});
+    chart($('g-epsi'), [{p: odom.map(q=>[q.d,q.sl]), c:css('--rojo'), w:4, a:.55}, {p: odom.map(q=>[q.d,q.sd]), c:css('--azul2'), w:1.6, dash:[6,5]},
+                        {p: odom.map(q=>[q.d,q.sk]), c:css('--verde'), w:2.2}], {cero:true, xl:'m'});
+    chart($('g-xy'), [{p: odom.map(q=>[q.xl,q.yl]), c:css('--rojo'), a:.7}, {p: odom.map(q=>[q.xr,q.yr]), c:'#ffffff', w:3.5},
+                      {p: odom.map(q=>[q.xk,q.yk]), c:css('--verde'), w:1.6}], {igual:true});
   } else if (vista === 'wall'){
     const t1 = wall.length ? wall[wall.length-1].t : 0, w = wall.filter(q => q.t > t1 - 40);
     chart($('g-wall'), [{p: w.map(q=>[q.t-t1,q.e]), c:css('--cian'), w:2.2}, {p: w.map(q=>[q.t-t1,q.D]), c:'#ffffff', a:.8},

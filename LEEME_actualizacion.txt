@@ -1,24 +1,26 @@
-Actualización v3 de la consola web
-==================================
-Pestañas: 1 Inicio (modo + guía) · 2 Calibración · 3 Operación (cámara de fondo, pedales
-translúcidos) · 4 Odometría · 5 Wall following (solo tuning). Manual/Autónomo sin relanzar.
+Actualización v4: odometría corregida para skid-steer + gráficas arregladas
+==========================================================================
+Incluye todo lo de la v3 (Inicio, cámara en Operación, cambio de modo en caliente) y además:
 
-Archivos (se descomprimen encima del workspace):
-  src/mi_robot_diferencial/scripts/aeb_mux.py              modo teleop|auto en caliente
-  src/mi_robot_diferencial/scripts/wall_follow.py          parámetro `activo`
-  src/mi_robot_diferencial/scripts/volante_web.py          la consola
-  src/mi_robot_diferencial/launch/robot_yahboom.launch.py  wall_follow siempre (detenido en teleop)
+  scripts/odometria_vueltas.py   publica también /odom_skid: odometría con vía efectiva
+                                 b_ef = 0.191 m (parámetro b_efectiva; 0 = desactivada)
+  scripts/detector_vueltas.py    la corregida entra al CSV, a la tabla y a las 3 gráficas
+  scripts/volante_web.py         pestaña Odometría: orientación sin saltos en ±180°,
+                                 DiffDrive punteada, metros/mm automáticos, línea corregida
+                                 y k en vivo (cuánto gira el robot respecto a las ruedas)
 
 Instalar:
   cd ~/ros2_ws_dif
-  git switch competencia-microros && git pull
   git switch consola-v2 2>/dev/null || git switch -c consola-v2
-  unzip -o ~/Downloads/actualizacion_consola_v3.zip -d ~/ros2_ws_dif
+  unzip -o ~/Downloads/actualizacion_consola_v4.zip -d ~/ros2_ws_dif
   chmod +x src/mi_robot_diferencial/scripts/*.py
   rm -rf build install log
   colcon build --packages-select mi_robot_diferencial && source install/setup.bash
   ros2 launch mi_robot_diferencial robot_yahboom.launch.py pista:=competencia volante:=true
 
+Comprobar la odometría corregida:
+  ros2 topic hz /odom_skid          (debe publicar, al ritmo de /joint_states)
+
 Volver a lo anterior:
-  git checkout -- . && git switch competencia-microros && git branch -D consola-v2
+  git checkout -- . && git switch competencia-microros
   rm -rf build install log && colcon build --packages-select mi_robot_diferencial && source install/setup.bash
