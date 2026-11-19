@@ -1,267 +1,308 @@
 #!/usr/bin/python3
 """
-aeb_mux.py — Selector de comandos (mux) + frenado autónomo de emergencia (AEB).
+aeb_mux.py — Mux de comandos + Frenado Automático de Emergencia (AEB) con LiDAR
+Robot MicroROS (Yahboom) en Gazebo (ROS 2 Jazzy + ros_gz)
 
-Requisito 7: los comandos de teleoperación y de autonomía van en tópicos separados y un nodo
-los lleva a /cmd_vel pasando por el AEB. Requisito 3: el AEB tiene prioridad sobre cualquier
-comando, en los dos modos.
+Arquitectura (este es el ÚNICO nodo que publica en /cmd_vel):
 
     /cmd_vel_teleop ─┐
-                     ├─► [ mux: elige según `modo` ] ─► [ AEB ] ─► /cmd_vel ─► DiffDrive
-    /cmd_vel_auto  ──┘                                     ▲
-                                              /scan, /odom ┘
+                     ├─► [ mux: modo=teleop|auto ] ─► [ AEB ] ─► /cmd_vel ─► DiffDrive
+    /cmd_vel_auto  ──┘                                  ▲    ▲
+                                              /scan ────┘    └── /odom (v, ω medidas)
 
-AEB (fórmula del reporte), para cada rayo i del LiDAR con ángulo θ_i y distancia r_i:
-    ṙ_i = −v cos θ_i            TTC_i = r_i / max(−ṙ_i, 0)
-  y se frena si mín_i TTC_i < ttc_umbral.
+Teleop con remap:
+    ros2 run teleop_twist_keyboard teleop_twist_keyboard --ros-args -r cmd_vel:=cmd_vel_teleop
 
-Decisiones de diseño (para evitar frenados falsos en curvas y en el estrechamiento):
-  1. Solo cuentan los rayos que caen en el CORREDOR que va a barrer el robot: una franja del
-     ancho del robot + margen a lo largo de la trayectoria predicha con (v, ω). Si ω ≈ 0 es una
-     franja recta; si no, es un arco de radio v/ω. Así los muros laterales del estrechamiento
-     (0.40 m de ancho, robot de 0.153 m) y el muro exterior de una curva que el robot sí está
-     tomando no disparan el freno.
-  2. r_i se mide desde el BORDE del robot y no desde el centro del LiDAR (que está en medio
-     del robot): r_i ← r_i − e(θ_i), con e la distancia del LiDAR al borde de la huella en esa
-     dirección. Así TTC es el tiempo hasta el contacto real.
-  3. v = la mayor (en magnitud) entre la velocidad medida (/odom) y la comandada, si van en el
-     mismo sentido. Con solo la medida, al frenar v → 0, TTC → ∞, se libera, acelera y vuelve a
-     frenar (avance a tirones contra el obstáculo). Con la comandada el freno se mantiene mientras
-     se siga pidiendo avanzar hacia el obstáculo.
-  4. Al frenar se anula la velocidad lineal; el giro (ω) puede pasar (permitir_giro) para que el
-     operador o el controlador puedan girar y alejarse. Reversa también pasa si atrás está libre
-     (el mismo cálculo con v < 0 usa los rayos traseros).
-  5. Histéresis: se suelta cuando mín TTC > histeresis · ttc_umbral, para no tartamudear.
+Idea física (fórmula del reporte):
+    Para un obstáculo estático visto en el rayo i (rango r_i, ángulo th_i), la tasa de
+    cambio del rango es  r_dot_i = -v*cos(th_i).
+    TTC_i = r_i / max(-r_dot_i, 0)      ->  frenar si min(TTC_i) < umbral
+    r_i se mide desde el BORDE del robot y no desde el LiDAR (que está en el centro):
+    así el TTC es el tiempo hasta el contacto real.
 
-Umbral por defecto (0.5 s), con v_max = 1.0 m/s y a_max = 2.0 m/s² (tabla del reporte):
-    t_frenado = v_max / (2·a_max) = 0.25 s   (frenando a a_max se recorre v²/2a = 0.25 m,
-                                              que a v_max equivalen a 0.25 s de TTC)
-  + t_lidar   = 0.10 s                       (el LiDAR va a 10 Hz: hasta 1 escaneo de retraso)
-  + t_margen  = 0.15 s                       (≈ 0.15 m de holgura a v_max)
-  = 0.50 s
+    Umbral mínimo físicamente necesario (latencia + desaceleración constante a):
+        d_frenado = v*t_lat + v^2/(2a)   y   d = v*TTC   ->   TTC_min = t_lat + v/(2a)
+    MicroROS: v_max = 1.0 m/s, a_max = 2.0 m/s², t_lat = 0.10 s (LiDAR a 10 Hz)
+        -> TTC_min(v_max) = 0.35 s.  Umbral base 0.5 s = 0.25 (frenado) + 0.10 (LiDAR)
+           + 0.15 (holgura ≈ 0.15 m a v_max).
+
+Modos (parámetro `mode`):
+    'corridor' (por defecto): solo cuentan los puntos dentro de la franja que barrerá el
+        robot (semiancho + margen) a lo largo de la trayectoria predicha con (v, ω):
+        recta si ω ≈ 0, arco de radio v/ω si no. Así no frenan los muros laterales del
+        estrechamiento de 0.40 m ni el muro exterior de una curva que sí se está tomando.
+        TTC_i = d_i / |v|, con d_i la distancia A LO LARGO DE LA TRAYECTORIA desde el borde
+        delantero (o trasero, en reversa) hasta el punto. Para un punto justo al frente es la
+        misma fórmula del rayo (θ = 0); para puntos de la franja que ya están AL LADO del
+        robot (d_i ≤ 0) no hay choque al avanzar y no cuentan. (Con r_i/(v cos θ_i) esos puntos
+        laterales daban TTC falsos ≈ 0.3 s al rozar 1° hacia un muro del estrechamiento.)
+    'ittc': todos los rayos que se acercan, con la fórmula pura TTC_i = r_i/(v cos θ_i).
+        OJO: frena en el estrechamiento (muros a 0.2 m). Solo para comparar en el reporte.
+
+Decisión (cada 1/rate s, aunque no lleguen comandos nuevos: el DiffDrive mantiene el último):
+    ttc_meas = TTC con (v, ω) medidas     ->  ¿ya voy hacia algo?            (emergencia)
+    ttc_cmd  = TTC con (v, ω) comandadas  ->  ¿el comando me lleva hacia algo? (inseguro)
+    La v lineal pasa solo si el comando es seguro y, en emergencia, solo si va en sentido
+    contrario al movimiento actual (alejarse). El giro pasa siempre (permitir_giro), para
+    poder reorientarse y desbloquear el freno (p. ej. al entrar al estrechamiento). OJO: el
+    giro en el sitio no se revisa; las esquinas barren hasta ≈0.14 m del LiDAR.
+    Rearme (solo teleop): tras un frenado, el MISMO comando que se frenó sigue bloqueado
+    aunque el corredor quede libre (p. ej. porque el robot rotó). Se libera cuando cambia
+    el comando (otra tecla, k, girar). Sin esto el robot reanuda solo hacia el siguiente muro.
+    Evaluar también el comando evita los tirones: al frenar v_meas -> 0 y ttc_meas -> inf,
+    pero mientras se siga pidiendo avanzar hacia el obstáculo ttc_cmd mantiene el freno.
+    Histéresis: estando activo, el umbral se multiplica por `histeresis` para soltar.
 
 Mux:
-  - `modo` = teleop | auto elige la fuente. La otra se ignora.
-  - Publica /cmd_vel a 20 Hz con el último comando de la fuente activa, revisado por el AEB
-    con el escaneo más reciente (el DiffDrive mantiene el último comando, así que el AEB tiene
-    que poder frenar aunque no lleguen comandos nuevos).
-  - Timeout: si la fuente activa deja de publicar más de `timeout_<modo>` s, manda cero.
-    En teleop viene desactivado (0): teleop_twist_keyboard publica solo al presionar teclas y
-    el robot debe seguir con el último comando, como sin mux.
+    `modo` = teleop | auto elige la fuente (la otra se ignora).
+    Si la fuente activa calla más de timeout_<modo> s manda cero. En teleop viene en 0
+    (se mantiene el último comando: teleop_twist_keyboard solo publica al presionar teclas).
+    Sin /scan reciente (timeout_scan) no se deja avanzar.
 
-Publica además, para depurar y para el pitch:
-  /aeb/activo   (std_msgs/Bool)     True mientras frena
-  /aeb/ttc_min  (std_msgs/Float64)  mínimo TTC del corredor [s] (inf si no hay peligro)
+Publica:
+    /cmd_vel      (geometry_msgs/Twist)  comando final
+    /aeb/activo   (std_msgs/Bool)        True mientras frena
+    /aeb/ttc_min  (std_msgs/Float64)     min(ttc_meas, ttc_cmd) [s], con tope ttc_tope para rqt_plot
 
 Uso (lo lanza robot_yahboom.launch.py con modo:=teleop|auto):
-  ros2 run mi_robot_diferencial aeb_mux.py --ros-args -p use_sim_time:=true -p modo:=teleop
-  ros2 run teleop_twist_keyboard teleop_twist_keyboard --ros-args -r cmd_vel:=cmd_vel_teleop
+    ros2 run mi_robot_diferencial aeb_mux.py --ros-args -p use_sim_time:=true -p modo:=teleop
 """
 import math
 
+import numpy as np
 import rclpy
 from rclpy.executors import ExternalShutdownException
 from rclpy.node import Node
-from rclpy.qos import QoSProfile, ReliabilityPolicy, HistoryPolicy
-from geometry_msgs.msg import Twist
-from nav_msgs.msg import Odometry
+from rclpy.qos import qos_profile_sensor_data
 from sensor_msgs.msg import LaserScan
+from nav_msgs.msg import Odometry
+from geometry_msgs.msg import Twist
 from std_msgs.msg import Bool, Float64
 
 
-class AEB:
-    """Cálculo puro del AEB (sin ROS)."""
-
-    def __init__(self, ttc_umbral=0.5, histeresis=1.3, frente=0.118, atras=0.0805,
-                 semiancho=0.0765, margen_lateral=0.03, w_min=0.05):
-        self.ttc_umbral = ttc_umbral
-        self.histeresis = histeresis
-        self.frente, self.atras, self.semiancho = frente, atras, semiancho  # huella desde el LiDAR
-        self.margen = margen_lateral
-        self.w_min = w_min
-        self.activo = False
-        self.autohits = []   # ángulos [rad] de rayos que pegaron dentro de la huella del robot
-        self._cache = None   # (n, angle_min, inc) -> (cos, sin, borde)
-
-    def _geometria(self, n, angle_min, inc):
-        clave = (n, round(angle_min, 6), round(inc, 9))
-        if self._cache is None or self._cache[0] != clave:
-            cs, sn, borde = [], [], []
-            for i in range(n):
-                th = angle_min + i * inc
-                c, s = math.cos(th), math.sin(th)
-                # distancia del LiDAR al borde de la huella (rectángulo) en la dirección θ
-                t = math.inf
-                if c > 1e-9:
-                    t = min(t, self.frente / c)
-                elif c < -1e-9:
-                    t = min(t, self.atras / -c)
-                if abs(s) > 1e-9:
-                    t = min(t, self.semiancho / abs(s))
-                cs.append(c); sn.append(s); borde.append(t)
-            self._cache = (clave, cs, sn, borde)
-        return self._cache[1:]
-
-    def en_corredor(self, x, y, v, w):
-        """¿El punto (x, y) [marco del robot] está en la franja que barrerá el robot?"""
-        ancho = self.semiancho + self.margen
-        if abs(w) < self.w_min or abs(v / w) > 50.0:
-            return (x > 0.0 if v > 0 else x < 0.0) and abs(y) < ancho
-        R = v / w                                   # radio con signo; centro en (0, R)
-        rho = math.hypot(x, y - R)
-        if abs(rho - abs(R)) >= ancho:
-            return False
-        # ángulo recorrido sobre el arco hasta el punto, en el sentido del movimiento
-        ang = math.atan2(x, (R - y) if R > 0 else (y - R)) * (1 if v > 0 else -1)
-        return 0.0 < (ang % (2 * math.pi)) < math.pi   # adelante, hasta media vuelta
-
-    def evaluar(self, ranges, angle_min, inc, range_min, range_max, v, w):
-        """Devuelve (ttc_min, angulo_del_rayo, frenar)."""
-        cs, sn, borde = self._geometria(len(ranges), angle_min, inc)
-        ttc_min, ang_min = math.inf, None
-        self.autohits = []
-        for i, r in enumerate(ranges):
-            if not (range_min <= r <= range_max) or math.isnan(r):
-                continue
-            # Un retorno dentro de la huella del robot (+1 cm) no puede ser un obstáculo:
-            # es el propio robot.
-            if r <= borde[i] + 0.01:
-                self.autohits.append(angle_min + i * inc)
-                continue
-            if abs(v) > 1e-3:
-                cierre = v * cs[i]                    # −ṙ_i = v cos θ_i
-                if cierre <= 0.0:
-                    continue
-                x, y = r * cs[i], r * sn[i]
-                if not self.en_corredor(x, y, v, w):
-                    continue
-                ttc = (r - borde[i]) / cierre          # TTC_i = r_i / max(−ṙ_i, 0), r desde el borde
-                if ttc < ttc_min:
-                    ttc_min, ang_min = ttc, angle_min + i * inc
-        lim = self.ttc_umbral * (self.histeresis if self.activo else 1.0)
-        self.activo = ttc_min < lim
-        return ttc_min, ang_min, self.activo
-
-
-def velocidad_a_evaluar(v_cmd, v_med):
-    """Decisión 3: la mayor entre la comandada y la medida si van en el mismo sentido."""
-    if v_cmd * v_med <= 0.0:
-        return v_cmd if abs(v_cmd) > 1e-3 else v_med
-    return math.copysign(max(abs(v_cmd), abs(v_med)), v_cmd)
-
-
-class NodoAEBMux(Node):
+class AEBNode(Node):
     def __init__(self):
         super().__init__('aeb_mux')
-        dp = self.declare_parameter
-        dp('modo', 'teleop')                 # teleop | auto
-        dp('ttc_umbral', 0.5)                # [s]  (justificación en el encabezado)
-        dp('histeresis', 1.3)
-        dp('frente', 0.118)                  # [m] LiDAR -> borde delantero (lente de la cámara)
-        dp('atras', 0.0805)                  # [m] LiDAR -> borde trasero
-        dp('semiancho', 0.0765)              # [m] mitad del ancho (cara exterior de las llantas)
-        dp('margen_lateral', 0.03)           # [m]
-        dp('permitir_giro', True)
-        dp('timeout_teleop', 0.0)            # [s] 0 = mantener el último comando
-        dp('timeout_auto', 0.5)              # [s]
-        dp('timeout_scan', 0.5)              # [s] sin LiDAR: no se deja avanzar
-        dp('frecuencia', 20.0)               # [Hz]
-        gp = lambda n: self.get_parameter(n).value  # noqa: E731
 
-        self.modo = gp('modo')
+        # %% Parámetros (ajustables con --ros-args -p nombre:=valor o ros2 param set)
+        dp = self.declare_parameter
+        dp('modo', 'teleop')            # teleop | auto     (fuente del mux)
+        dp('mode', 'corridor')          # 'corridor' | 'ittc' (qué rayos cuentan)
+        dp('ttc_threshold', 0.5)        # [s] umbral base
+        dp('a_max', 2.0)                # [m/s^2] desaceleración del MicroROS (tabla)
+        dp('t_latency', 0.10)           # [s] LiDAR a 10 Hz: hasta un escaneo de retraso
+        dp('histeresis', 1.3)           # suelta cuando TTC > histeresis * umbral
+        # Huella vista desde el LiDAR (las pasa el launch según robot:=microros|pro)
+        dp('frente', 0.118)             # [m] LiDAR -> borde delantero (lente de la cámara)
+        dp('atras', 0.0805)             # [m] LiDAR -> borde trasero
+        dp('semiancho', 0.0765)         # [m] mitad del ancho (cara exterior de las llantas)
+        dp('margen_lateral', 0.02)      # [m] margen del corredor a cada lado (3 cm frenaba por ruido del LiDAR descentrado en el estrechamiento)
+        dp('w_min', 0.05)               # [rad/s] por debajo el corredor es recto
+        dp('v_min', 0.01)               # [m/s] por debajo no se evalúa
+        dp('permitir_giro', True)       # dejar pasar ω al frenar (para alejarse / desbloquear)
+        dp('rearmar_teleop', True)      # tras frenar, el mismo comando sigue bloqueado
+        dp('timeout_teleop', 0.0)       # [s] 0 = mantener el último comando
+        dp('timeout_auto', 0.5)         # [s]
+        dp('timeout_scan', 0.5)         # [s] sin LiDAR no se avanza
+        dp('ttc_tope', 10.0)            # [s] tope de /aeb/ttc_min para graficar
+        dp('rate', 20.0)                # [Hz] lazo de control
+
+        self.modo = self.p('modo')
         if self.modo not in ('teleop', 'auto'):
             raise ValueError(f"modo debe ser 'teleop' o 'auto', no '{self.modo}'")
-        self.aeb = AEB(gp('ttc_umbral'), gp('histeresis'), gp('frente'), gp('atras'),
-                       gp('semiancho'), gp('margen_lateral'))
-        self.permitir_giro = gp('permitir_giro')
-        self.timeout = gp('timeout_' + self.modo)
-        self.timeout_scan = gp('timeout_scan')
 
-        self.cmd, self.t_cmd = Twist(), None
-        self.scan, self.t_scan = None, None
-        self.v_med = 0.0
-        self.estaba_activo = False
+        # %% Estado
+        self.r = None          # distancia desde el BORDE del robot (rayos válidos)
+        self.th = None         # ángulos correspondientes
+        self.x = self.y = None # puntos en el marco del LiDAR
+        self.autohits = None   # ángulos de rayos que pegan en el propio robot
+        self.t_scan = None
+        self.v_meas = 0.0      # velocidad lineal medida (/odom)
+        self.w_meas = 0.0      # velocidad angular medida (/odom)
+        self.cmd = Twist()     # último comando de la fuente activa
+        self.t_cmd = None
+        self.activo = False
+        self.bloqueado = None  # (v, ω) del comando que frenó el AEB (rearme)
 
-        qos_s = QoSProfile(depth=5, reliability=ReliabilityPolicy.BEST_EFFORT,
-                           history=HistoryPolicy.KEEP_LAST)
-        self.create_subscription(Twist, '/cmd_vel_' + self.modo, self.cb_cmd, 10)
-        self.create_subscription(LaserScan, '/scan', self.cb_scan, qos_s)
-        self.create_subscription(Odometry, '/odom', self.cb_odom, qos_s)
-        self.pub = self.create_publisher(Twist, '/cmd_vel', 10)
-        self.pub_activo = self.create_publisher(Bool, '/aeb/activo', 10)
+        # %% Comunicación
+        self.create_subscription(LaserScan, '/scan', self.scan_cb, qos_profile_sensor_data)
+        self.create_subscription(Odometry, '/odom', self.odom_cb, qos_profile_sensor_data)
+        self.create_subscription(Twist, '/cmd_vel_' + self.modo, self.cmd_cb, 10)
+        self.pub_cmd = self.create_publisher(Twist, '/cmd_vel', 10)
+        self.pub_active = self.create_publisher(Bool, '/aeb/activo', 10)
         self.pub_ttc = self.create_publisher(Float64, '/aeb/ttc_min', 10)
-        self.create_timer(1.0 / gp('frecuencia'), self.cb_timer)
+
+        self.create_timer(1.0 / self.p('rate'), self.loop)
         self.get_logger().info(
-            f"Modo {self.modo.upper()}: /cmd_vel_{self.modo} -> AEB -> /cmd_vel | "
-            f"TTC umbral {gp('ttc_umbral'):.2f} s | timeout {self.timeout:.1f} s")
+            f"Modo {self.modo.upper()}: /cmd_vel_{self.modo} -> AEB ({self.p('mode')}) -> /cmd_vel"
+            f" | umbral {self.p('ttc_threshold'):.2f} s")
+
+    def p(self, nombre):
+        return self.get_parameter(nombre).value
 
     def ahora(self):
         return self.get_clock().now().nanoseconds * 1e-9
 
-    def cb_cmd(self, msg):
+    # ------------------------------------------------------------------ callbacks
+    def scan_cb(self, msg: LaserScan):
+        r = np.asarray(msg.ranges, dtype=float)
+        th = msg.angle_min + np.arange(r.size) * msg.angle_increment
+        # Descartar inf, nan y lecturas fuera de rango del sensor
+        valid = np.isfinite(r) & (r >= msg.range_min) & (r <= msg.range_max)
+        r, th = r[valid], th[valid]
+
+        # Distancia del LiDAR al borde de la huella (rectángulo) en la dirección th
+        c, s = np.cos(th), np.sin(th)
+        inf = np.full_like(r, np.inf)
+        tx = np.where(c > 1e-9, np.divide(self.p('frente'), c, out=inf.copy(), where=c > 1e-9),
+                      np.divide(self.p('atras'), -c, out=inf.copy(), where=c < -1e-9))
+        ty = np.divide(self.p('semiancho'), np.abs(s), out=inf.copy(), where=np.abs(s) > 1e-9)
+        borde = np.minimum(tx, ty)
+
+        # Un retorno dentro de la huella (+1 cm) no es un obstáculo: es el propio robot
+        auto = r <= borde + 0.01
+        self.autohits = th[auto]
+        keep = ~auto
+        self.th = th[keep]
+        self.x, self.y = r[keep] * c[keep], r[keep] * s[keep]
+        self.r = r[keep] - borde[keep]          # r_i desde el borde del robot
+        self.t_scan = self.ahora()
+
+    def odom_cb(self, msg: Odometry):
+        self.v_meas = msg.twist.twist.linear.x
+        self.w_meas = msg.twist.twist.angular.z
+
+    def cmd_cb(self, msg: Twist):
         self.cmd, self.t_cmd = msg, self.ahora()
 
-    def cb_scan(self, msg):
-        self.scan, self.t_scan = msg, self.ahora()
+    # ------------------------------------------------------------------ TTC
+    def dist_corredor(self, v: float, w: float) -> np.ndarray:
+        """Distancia a lo largo de la trayectoria (v, ω) desde el borde delantero (v>0) o
+        trasero (v<0) hasta cada punto de la franja que barrerá el robot; inf si no está."""
+        x, y = self.x, self.y
+        ancho = self.p('semiancho') + self.p('margen_lateral')
+        borde = self.p('frente') if v > 0 else self.p('atras')
+        if abs(w) < self.p('w_min') or abs(v / w) > 50.0:
+            # Recta: franja del ancho del robot hacia adelante (v>0) o atrás (v<0)
+            d = (x if v > 0 else -x) - borde
+            ok = (np.abs(y) < ancho) & (d > 0.0)
+            return np.where(ok, d, np.inf)
+        # Arco de radio con signo R = v/ω, centro en (0, R)
+        R = v / w
+        rho = np.hypot(x, y - R)
+        dentro = np.abs(rho - abs(R)) < ancho
+        # Ángulo recorrido sobre el arco hasta el punto, en el sentido del movimiento
+        ang = np.arctan2(x, (R - y) if R > 0 else (y - R)) * (1.0 if v > 0 else -1.0)
+        ang = np.mod(ang, 2.0 * math.pi)
+        # menos el ángulo que ya ocupa el robot hasta su borde, por la longitud del arco
+        d = (ang - math.atan2(borde, abs(R))) * abs(R)
+        ok = dentro & (ang < math.pi) & (d > 0.0)          # adelante, hasta media vuelta
+        return np.where(ok, d, np.inf)
 
-    def cb_odom(self, msg):
-        self.v_med = msg.twist.twist.linear.x
+    def compute_ttc(self, v: float, w: float):
+        """(TTC mínimo [s], ángulo del rayo [rad]) si el robot se mueve con (v, ω)."""
+        if self.r is None or self.r.size == 0 or abs(v) < self.p('v_min'):
+            return math.inf, None
 
-    def cb_timer(self):
+        if self.p('mode') == 'corridor':
+            ttc = self.dist_corredor(v, w) / abs(v)          # TTC_i = d_i / |v|
+        else:
+            closing = v * np.cos(self.th)                    # = -r_dot
+            with np.errstate(divide='ignore'):
+                ttc = np.where(closing > 0.0,                # solo rayos que se acercan
+                               np.clip(self.r, 0.0, None) / closing, np.inf)
+        i = int(np.argmin(ttc))
+        if not np.isfinite(ttc[i]):
+            return math.inf, None
+        return float(ttc[i]), float(self.th[i])
+
+    def threshold(self, v: float) -> float:
+        """Umbral dinámico: nunca menor que t_lat + |v|/(2a); con histeresis si ya frena."""
+        base = max(self.p('ttc_threshold'), self.p('t_latency') + abs(v) / (2.0 * self.p('a_max')))
+        return base * (self.p('histeresis') if self.activo else 1.0)
+
+    # ------------------------------------------------------------------ lazo
+    def loop(self):
         t = self.ahora()
-        salida = Twist()
-        # 1) mux: comando de la fuente activa (o cero si está vencido / no ha llegado)
-        if self.t_cmd is not None and (self.timeout <= 0.0 or t - self.t_cmd <= self.timeout):
-            salida.linear.x = self.cmd.linear.x
-            salida.angular.z = self.cmd.angular.z
+
+        # 1) Mux: último comando de la fuente activa (o cero si está vencido / no ha llegado)
+        timeout = self.p('timeout_' + self.modo)
+        v_cmd = w_cmd = 0.0
+        if self.t_cmd is not None and (timeout <= 0.0 or t - self.t_cmd <= timeout):
+            v_cmd, w_cmd = self.cmd.linear.x, self.cmd.angular.z
 
         # 2) AEB
-        if self.scan is None or t - self.t_scan > self.timeout_scan:
-            ttc, ang, frenar = math.nan, None, abs(salida.linear.x) > 0.0   # sin LiDAR no se avanza
+        out = Twist()
+        out.angular.z = w_cmd
+        if self.t_scan is None or t - self.t_scan > self.p('timeout_scan'):
+            # Sin LiDAR no se deja avanzar
+            ttc, ang = math.nan, None
+            active = abs(v_cmd) > 0.0
+            out.linear.x = 0.0
         else:
-            v = velocidad_a_evaluar(salida.linear.x, self.v_med)
-            s = self.scan
-            ttc, ang, frenar = self.aeb.evaluar(s.ranges, s.angle_min, s.angle_increment,
-                                                s.range_min, s.range_max, v, salida.angular.z)
-        if self.aeb.autohits:
-            a = [math.degrees(x) for x in self.aeb.autohits]
-            self.get_logger().warn(
-                f'{len(a)} rayos del LiDAR pegan en el propio robot (entre {min(a):.0f}° y {max(a):.0f}°): '
-                'se ignoran en el AEB', throttle_duration_sec=10.0)
-        if frenar:
-            salida.linear.x = 0.0
-            if not self.permitir_giro:
-                salida.angular.z = 0.0
+            ttc_meas, ang_meas = self.compute_ttc(self.v_meas, self.w_meas)  # ¿ya voy hacia algo?
+            ttc_cmd, ang_cmd = self.compute_ttc(v_cmd, w_cmd)               # ¿el comando me lleva?
 
-        if frenar != self.estaba_activo:
-            if frenar:
+            emergency = ttc_meas < self.threshold(self.v_meas)
+            unsafe_cmd = ttc_cmd < self.threshold(v_cmd)
+
+            # La v lineal pasa solo si es segura y, en emergencia, solo si va en sentido
+            # contrario al movimiento actual (alejarse).
+            allow_linear = (not unsafe_cmd) and not (emergency and v_cmd * self.v_meas > 0.0)
+            out.linear.x = v_cmd if allow_linear else 0.0
+
+            active = emergency or (unsafe_cmd and abs(v_cmd) > 0.0)
+            ttc, ang = (ttc_meas, ang_meas) if ttc_meas <= ttc_cmd else (ttc_cmd, ang_cmd)
+
+            # Rearme (teleop): el mismo comando que se frenó sigue frenado hasta que cambie
+            if self.modo == 'teleop' and self.p('rearmar_teleop'):
+                if abs(v_cmd) > 0.0 and out.linear.x == 0.0 and active:
+                    self.bloqueado = (v_cmd, w_cmd)
+                elif self.bloqueado is not None:
+                    if (v_cmd, w_cmd) == self.bloqueado:
+                        out.linear.x, active = 0.0, True
+                    else:
+                        self.bloqueado = None
+
+        if active and not self.p('permitir_giro'):
+            out.angular.z = 0.0
+
+        self.pub_cmd.publish(out)
+        self.pub_active.publish(Bool(data=bool(active)))
+        self.pub_ttc.publish(Float64(data=float(min(ttc, self.p('ttc_tope')))
+                                     if not math.isnan(ttc) else math.nan))
+
+        # Mensajes solo en los cambios de estado
+        if active != self.activo:
+            if active:
                 self.get_logger().warn(
                     f'AEB: FRENO  (TTC mín {ttc:.2f} s' +
                     (f', rayo a {math.degrees(ang):.0f}°)' if ang is not None else ', sin /scan)'))
             else:
                 self.get_logger().info('AEB: libre')
-            self.estaba_activo = frenar
+            self.activo = active
 
-        self.pub.publish(salida)
-        self.pub_activo.publish(Bool(data=bool(frenar)))
-        self.pub_ttc.publish(Float64(data=float(ttc)))
+        if self.autohits is not None and self.autohits.size:
+            a = np.degrees(self.autohits)
+            self.get_logger().warn(
+                f'{a.size} rayos del LiDAR pegan en el propio robot (entre {a.min():.0f}° y '
+                f'{a.max():.0f}°): se ignoran en el AEB', throttle_duration_sec=10.0)
 
 
 def main():
     rclpy.init()
-    nodo = NodoAEBMux()
+    node = AEBNode()
     try:
-        rclpy.spin(nodo)
+        rclpy.spin(node)
     except (KeyboardInterrupt, ExternalShutdownException):
         pass
     finally:
         try:
-            nodo.pub.publish(Twist())        # dejar el robot quieto al cerrar
+            node.pub_cmd.publish(Twist())   # dejar el robot quieto al salir
         except Exception:  # noqa: BLE001
             pass
-        nodo.destroy_node()
-        if rclpy.ok():
-            rclpy.shutdown()
+        node.destroy_node()
+        rclpy.try_shutdown()
 
 
 if __name__ == '__main__':

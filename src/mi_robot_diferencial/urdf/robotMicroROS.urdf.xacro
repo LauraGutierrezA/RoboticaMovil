@@ -92,7 +92,7 @@
         <material name="rin"><color rgba="0.8 0.8 0.8 1"/></material>
       </visual>
       <collision>
-        <geometry><cylinder radius="${rueda_radio}" length="${rueda_ancho}"/></geometry>
+        <geometry><sphere radius="${rueda_radio}"/></geometry>
       </collision>
       <inertial>
         <mass value="${masa_rueda}"/>
