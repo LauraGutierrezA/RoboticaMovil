@@ -33,6 +33,7 @@ install(PROGRAMS
   scripts/odometria_vueltas.py
   scripts/detector_vueltas.py
   scripts/aeb_mux.py
+  scripts/wall_follow.py
   scripts/volante_web.py
   DESTINATION lib/${PROJECT_NAME})
 

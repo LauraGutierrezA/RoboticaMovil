@@ -6,6 +6,10 @@ Lanza la simulación con el robot y la pista que se elijan.
   ros2 launch mi_robot_diferencial robot_yahboom.launch.py pista:=competencia
   ros2 launch mi_robot_diferencial robot_yahboom.launch.py robot:=pro          # robot de cajas original (por defecto: microros)
   ros2 launch mi_robot_diferencial robot_yahboom.launch.py modo:=auto          # obedece /cmd_vel_auto
+  ros2 launch mi_robot_diferencial robot_yahboom.launch.py modo:=auto algoritmo:=ninguno   # auto sin controlador
+                                                                               # (para publicar /cmd_vel_auto a mano)
+En modo auto se lanza también el algoritmo autónomo (por defecto wall_follow.py, que publica
+en /cmd_vel_auto y pasa por el AEB).
 
 Los comandos pasan siempre por aeb_mux.py (mux + frenado de emergencia) antes de llegar a /cmd_vel.
 Teleoperación, en otra terminal:
@@ -54,6 +58,7 @@ def lanzar(context):
     lx, ly, lyaw, lsemi = cfg['linea']
     world_path = os.path.join(pkg, 'worlds', cfg['mundo'])
     modo = LaunchConfiguration('modo').perform(context)
+    algoritmo = LaunchConfiguration('algoritmo').perform(context)
     frente, atras, semiancho = ROBOTS[robot]['huella']
     xacro_path = os.path.join(pkg, 'urdf', ROBOTS[robot]['xacro'])
     bridge_config = os.path.join(pkg, 'config', 'bridge.yaml')
@@ -61,13 +66,17 @@ def lanzar(context):
     # El URDF generado por xacro se pasa como string, no como YAML
     robot_description = ParameterValue(Command(['xacro ', xacro_path]), value_type=str)
 
-    nodos = []
+    nodos_extra = []
     if LaunchConfiguration('volante').perform(context) == 'true':
         # El celular como volante -> /cmd_vel_teleop (pasa por el AEB igual que el teclado)
-        nodos.append(Node(package='mi_robot_diferencial', executable='volante_web.py',
-                          output='screen'))
+        nodos_extra.append(Node(package='mi_robot_diferencial', executable='volante_web.py',
+                               output='screen'))
+    if modo == 'auto' and algoritmo != 'ninguno':
+        # Controlador autónomo reactivo: /scan -> /cmd_vel_auto (el AEB va detrás, en aeb_mux)
+        nodos_extra.append(Node(package='mi_robot_diferencial', executable=algoritmo + '.py',
+                               output='screen', parameters=[{'use_sim_time': True}]))
 
-    return nodos + [
+    return nodos_extra + [
         # Gazebo con la pista, arrancando sin pausa (-r)
         ExecuteProcess(cmd=['gz', 'sim', '-r', '-v4', world_path], output='screen'),
         Node(
@@ -116,6 +125,9 @@ def generate_launch_description():
                               description='teleop: /cmd_vel_teleop pasa al robot; auto: /cmd_vel_auto'),
         DeclareLaunchArgument('volante', default_value='false', choices=['true', 'false'],
                               description='true: lanza volante_web.py (el celular como volante)'),
+        DeclareLaunchArgument('algoritmo', default_value='wall_follow',
+                              choices=['wall_follow', 'ninguno'],
+                              description='Controlador autónomo que se lanza con modo:=auto'),
         DeclareLaunchArgument('vueltas', default_value='3',
                               description='Vueltas tras las que detector_vueltas guarda resultados'),
         DeclareLaunchArgument('carpeta_salida', default_value='~/resultados_vueltas',
