@@ -27,22 +27,25 @@ Idea física (fórmula del reporte):
            + 0.15 (holgura ≈ 0.15 m a v_max).
 
 Modos (parámetro `mode`):
-    'corridor' (por defecto): solo cuentan los rayos dentro de la franja que barrerá el
+    'corridor' (por defecto): solo cuentan los puntos dentro de la franja que barrerá el
         robot (semiancho + margen) a lo largo de la trayectoria predicha con (v, ω):
         recta si ω ≈ 0, arco de radio v/ω si no. Así no frenan los muros laterales del
         estrechamiento de 0.40 m ni el muro exterior de una curva que sí se está tomando.
-    'ittc': todos los rayos que se acercan (la fórmula pura). OJO: frena en el
-        estrechamiento (muros a 0.2 m dan TTC ≈ 0.4/v). Solo para comparar en el reporte.
+        TTC_i = d_i / |v|, con d_i la distancia A LO LARGO DE LA TRAYECTORIA desde el borde
+        delantero (o trasero, en reversa) hasta el punto. Para un punto justo al frente es la
+        misma fórmula del rayo (θ = 0); para puntos de la franja que ya están AL LADO del
+        robot (d_i ≤ 0) no hay choque al avanzar y no cuentan. (Con r_i/(v cos θ_i) esos puntos
+        laterales daban TTC falsos ≈ 0.3 s al rozar 1° hacia un muro del estrechamiento.)
+    'ittc': todos los rayos que se acercan, con la fórmula pura TTC_i = r_i/(v cos θ_i).
+        OJO: frena en el estrechamiento (muros a 0.2 m). Solo para comparar en el reporte.
 
 Decisión (cada 1/rate s, aunque no lleguen comandos nuevos: el DiffDrive mantiene el último):
     ttc_meas = TTC con (v, ω) medidas     ->  ¿ya voy hacia algo?            (emergencia)
     ttc_cmd  = TTC con (v, ω) comandadas  ->  ¿el comando me lleva hacia algo? (inseguro)
     La v lineal pasa solo si el comando es seguro y, en emergencia, solo si va en sentido
-    contrario al movimiento actual (alejarse).
-    Giro: con la v lineal en cero, girar en el sitio solo se permite si cabe. El robot es
-    un rectángulo: al girar, sus esquinas barren un círculo de radio
-    R_giro = hypot(max(frente, atras), semiancho) ≈ 0.14 m. Si hay un punto del LiDAR dentro
-    de R_giro + margen_giro, girar choca y se anula ω (proteger_giro).
+    contrario al movimiento actual (alejarse). El giro pasa siempre (permitir_giro), para
+    poder reorientarse y desbloquear el freno (p. ej. al entrar al estrechamiento). OJO: el
+    giro en el sitio no se revisa; las esquinas barren hasta ≈0.14 m del LiDAR.
     Rearme (solo teleop): tras un frenado, el MISMO comando que se frenó sigue bloqueado
     aunque el corredor quede libre (p. ej. porque el robot rotó). Se libera cuando cambia
     el comando (otra tecla, k, girar). Sin esto el robot reanuda solo hacia el siguiente muro.
@@ -93,12 +96,10 @@ class AEBNode(Node):
         dp('frente', 0.118)             # [m] LiDAR -> borde delantero (lente de la cámara)
         dp('atras', 0.0805)             # [m] LiDAR -> borde trasero
         dp('semiancho', 0.0765)         # [m] mitad del ancho (cara exterior de las llantas)
-        dp('margen_lateral', 0.03)      # [m] margen del corredor a cada lado
+        dp('margen_lateral', 0.02)      # [m] margen del corredor a cada lado (3 cm frenaba por ruido del LiDAR descentrado en el estrechamiento)
         dp('w_min', 0.05)               # [rad/s] por debajo el corredor es recto
         dp('v_min', 0.01)               # [m/s] por debajo no se evalúa
-        dp('permitir_giro', True)       # dejar pasar ω al frenar (para alejarse)...
-        dp('proteger_giro', True)       # ...pero solo si girar en el sitio no choca
-        dp('margen_giro', 0.02)         # [m] margen sobre el radio que barren las esquinas
+        dp('permitir_giro', True)       # dejar pasar ω al frenar (para alejarse / desbloquear)
         dp('rearmar_teleop', True)      # tras frenar, el mismo comando sigue bloqueado
         dp('timeout_teleop', 0.0)       # [s] 0 = mantener el último comando
         dp('timeout_auto', 0.5)         # [s]
@@ -121,7 +122,6 @@ class AEBNode(Node):
         self.cmd = Twist()     # último comando de la fuente activa
         self.t_cmd = None
         self.activo = False
-        self.rho = None        # distancia de cada punto al LiDAR (sin restar el borde)
         self.bloqueado = None  # (v, ω) del comando que frenó el AEB (rearme)
 
         # %% Comunicación
@@ -165,7 +165,6 @@ class AEBNode(Node):
         keep = ~auto
         self.th = th[keep]
         self.x, self.y = r[keep] * c[keep], r[keep] * s[keep]
-        self.rho = r[keep]                      # distancia al LiDAR (para el giro)
         self.r = r[keep] - borde[keep]          # r_i desde el borde del robot
         self.t_scan = self.ahora()
 
@@ -177,13 +176,17 @@ class AEBNode(Node):
         self.cmd, self.t_cmd = msg, self.ahora()
 
     # ------------------------------------------------------------------ TTC
-    def en_corredor(self, v: float, w: float) -> np.ndarray:
-        """Máscara: ¿el punto (x, y) está en la franja que barrerá el robot con (v, ω)?"""
+    def dist_corredor(self, v: float, w: float) -> np.ndarray:
+        """Distancia a lo largo de la trayectoria (v, ω) desde el borde delantero (v>0) o
+        trasero (v<0) hasta cada punto de la franja que barrerá el robot; inf si no está."""
         x, y = self.x, self.y
         ancho = self.p('semiancho') + self.p('margen_lateral')
+        borde = self.p('frente') if v > 0 else self.p('atras')
         if abs(w) < self.p('w_min') or abs(v / w) > 50.0:
             # Recta: franja del ancho del robot hacia adelante (v>0) o atrás (v<0)
-            return ((x > 0.0) if v > 0 else (x < 0.0)) & (np.abs(y) < ancho)
+            d = (x if v > 0 else -x) - borde
+            ok = (np.abs(y) < ancho) & (d > 0.0)
+            return np.where(ok, d, np.inf)
         # Arco de radio con signo R = v/ω, centro en (0, R)
         R = v / w
         rho = np.hypot(x, y - R)
@@ -191,30 +194,27 @@ class AEBNode(Node):
         # Ángulo recorrido sobre el arco hasta el punto, en el sentido del movimiento
         ang = np.arctan2(x, (R - y) if R > 0 else (y - R)) * (1.0 if v > 0 else -1.0)
         ang = np.mod(ang, 2.0 * math.pi)
-        return dentro & (ang > 0.0) & (ang < math.pi)      # adelante, hasta media vuelta
+        # menos el ángulo que ya ocupa el robot hasta su borde, por la longitud del arco
+        d = (ang - math.atan2(borde, abs(R))) * abs(R)
+        ok = dentro & (ang < math.pi) & (d > 0.0)          # adelante, hasta media vuelta
+        return np.where(ok, d, np.inf)
 
     def compute_ttc(self, v: float, w: float):
         """(TTC mínimo [s], ángulo del rayo [rad]) si el robot se mueve con (v, ω)."""
         if self.r is None or self.r.size == 0 or abs(v) < self.p('v_min'):
             return math.inf, None
 
-        closing = v * np.cos(self.th)            # = -r_dot
-        mask = closing > 0.0                     # solo rayos que se acercan
         if self.p('mode') == 'corridor':
-            mask &= self.en_corredor(v, w)       # y que estén en la trayectoria
-        if not mask.any():
-            return math.inf, None
-
-        ttc = np.clip(self.r[mask], 0.0, None) / closing[mask]
+            ttc = self.dist_corredor(v, w) / abs(v)          # TTC_i = d_i / |v|
+        else:
+            closing = v * np.cos(self.th)                    # = -r_dot
+            with np.errstate(divide='ignore'):
+                ttc = np.where(closing > 0.0,                # solo rayos que se acercan
+                               np.clip(self.r, 0.0, None) / closing, np.inf)
         i = int(np.argmin(ttc))
-        return float(ttc[i]), float(self.th[mask][i])
-
-    def giro_choca(self) -> bool:
-        """¿Girar en el sitio barre algún punto? (esquinas: círculo de radio R_giro)."""
-        if self.rho is None or self.rho.size == 0:
-            return False
-        r_giro = math.hypot(max(self.p('frente'), self.p('atras')), self.p('semiancho'))
-        return bool(np.any(self.rho < r_giro + self.p('margen_giro')))
+        if not np.isfinite(ttc[i]):
+            return math.inf, None
+        return float(ttc[i]), float(self.th[i])
 
     def threshold(self, v: float) -> float:
         """Umbral dinámico: nunca menor que t_lat + |v|/(2a); con histeresis si ya frena."""
@@ -264,11 +264,8 @@ class AEBNode(Node):
                     else:
                         self.bloqueado = None
 
-        # Giro: pasa al frenar (para alejarse), pero solo si girar en el sitio no choca
-        if out.linear.x == 0.0 and abs(out.angular.z) > 0.0:
-            if (active and not self.p('permitir_giro')) or \
-               (self.p('proteger_giro') and self.giro_choca()):
-                out.angular.z = 0.0
+        if active and not self.p('permitir_giro'):
+            out.angular.z = 0.0
 
         self.pub_cmd.publish(out)
         self.pub_active.publish(Bool(data=bool(active)))
