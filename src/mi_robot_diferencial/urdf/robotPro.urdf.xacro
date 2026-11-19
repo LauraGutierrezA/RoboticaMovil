@@ -1,18 +1,15 @@
 <?xml version="1.0"?>
 <robot name="robotPro" xmlns:xacro="http://www.ros.org/wiki/xacro">
 
-
-  <xacro:property name="rueda_radio" value="0.024"/>          
-  <xacro:property name="rueda_ancho" value="0.0215"/>         
-  <xacro:property name="separacion_ruedas" value="0.1315"/>   
-  <xacro:property name="distancia_ejes" value="0.095"/>        
+  <!-- Medidas, masas y límites de la tabla del reporte (un solo archivo para los dos modelos) -->
+  <xacro:include filename="parametros_microros.xacro"/>
 
   <!-- Link en el piso: el robot spawnea con las ruedas apoyadas -->
   <link name="base_footprint"/>
   <joint name="joint_base" type="fixed">
     <parent link="base_footprint"/>
     <child link="base_link"/>
-    <origin xyz="0 0 ${rueda_radio + 0.01}" rpy="0 0 0"/>  <!-- radio + 0.01 (las ruedas están 0.01 por debajo del centro del chasis) -->
+    <origin xyz="0 0 ${base_altura}" rpy="0 0 0"/>  <!-- radio + 0.01 (las ruedas están 0.01 por debajo del centro del chasis) -->
   </joint>
 
   <link name="base_link">
@@ -35,8 +32,9 @@
       <geometry><box size="0.13 0.09 0.04"/></geometry>
     </collision>
     <inertial>
-      <mass value="0.637"/>
-      <inertia ixx="0.00077" ixy="0.0" ixz="0.0" iyy="0.0022" iyz="0.0" izz="0.0027"/>
+      <mass value="${masa_chasis}"/>
+      <!-- caja maciza que envuelve los dos bloques del chasis: 0.1986 x 0.10 x 0.085 m -->
+      <xacro:inercia_caja m="${masa_chasis}" x="0.1986" y="0.10" z="0.085"/>
     </inertial>
   </link>
 
@@ -50,8 +48,8 @@
         <geometry><cylinder radius="${rueda_radio}" length="${rueda_ancho}"/></geometry>
       </collision>
       <inertial>
-        <mass value="0.05"/>
-        <inertia ixx="0.00001" ixy="0.0" ixz="0.0" iyy="0.00001" iyz="0.0" izz="0.0000144"/>
+        <mass value="${masa_rueda}"/>
+        <xacro:inercia_rueda/>
       </inertial>
     </link>
 
@@ -77,17 +75,13 @@
       <right_joint>joint_rueda_der_tra</right_joint>
       <wheel_separation>${separacion_ruedas}</wheel_separation>
       <wheel_radius>${rueda_radio}</wheel_radius>
+      <!-- Límites de la tabla: 1.0 m/s, 4.0 rad/s, 2.0 m/s² -->
+      <xacro:limites_diffdrive/>
       <odom_publish_frequency>30</odom_publish_frequency>
       <topic>cmd_vel</topic>
       <odom_topic>odom</odom_topic>
       <frame_id>odom</frame_id>
       <child_frame_id>base_footprint</child_frame_id>
-      <max_linear_velocity>1.0</max_linear_velocity>
-      <min_linear_velocity>-1.0</min_linear_velocity>
-      <max_angular_velocity>4.0</max_angular_velocity>
-      <min_angular_velocity>-4.0</min_angular_velocity>
-      <max_linear_acceleration>2.0</max_linear_acceleration>
-      <min_linear_acceleration>-2.0</min_linear_acceleration>
   </plugin>
   </gazebo>
 
@@ -97,12 +91,12 @@
     <material name="negro"><color rgba="0.1 0.1 0.1 1"/></material>
   </visual>
   <collision><geometry><cylinder radius="0.0189" length="0.033"/></geometry></collision>
-  <inertial><mass value="0.04"/><inertia ixx="0.0000072" ixy="0" ixz="0" iyy="0.0000072" iyz="0" izz="0.0000071"/></inertial>
+  <inertial><mass value="${masa_lidar}"/><inertia ixx="0.0000072" ixy="0" ixz="0" iyy="0.0000072" iyz="0" izz="0.0000071"/></inertial>
 </link>
 <joint name="joint_lidar" type="fixed">
   <parent link="base_link"/>
   <child link="lidar_link"/>
-  <origin xyz="0.013 0 0.079" rpy="0 0 0"/>
+  <origin xyz="0.013 0 ${lidar_altura - base_altura}" rpy="0 0 0"/>  <!-- plano de escaneo a 108 mm del piso (tabla) -->
 </joint>
 
 <link name="camera_link">
@@ -111,7 +105,7 @@
     <material name="negro"><color rgba="0.1 0.1 0.1 1"/></material>
   </visual>
   <collision><geometry><box size="0.017 0.048 0.032"/></geometry></collision>
-  <inertial><mass value="0.0186"/><inertia ixx="0.0000052" ixy="0" ixz="0" iyy="0.0000019" iyz="0" izz="0.0000039"/></inertial>
+  <inertial><mass value="${masa_camara}"/><inertia ixx="0.0000052" ixy="0" ixz="0" iyy="0.0000019" iyz="0" izz="0.0000039"/></inertial>
 </link>
 <joint name="joint_camera" type="fixed">
   <parent link="base_link"/>
@@ -126,7 +120,7 @@
     <geometry><cylinder radius="0.004" length="0.08"/></geometry>
     <material name="negro"><color rgba="0.1 0.1 0.1 1"/></material>
   </visual>
-  <inertial><mass value="0.01"/><inertia ixx="0.00001" ixy="0" ixz="0" iyy="0.00001" iyz="0" izz="0.00001"/></inertial>
+  <inertial><mass value="${masa_antena}"/><inertia ixx="0.00001" ixy="0" ixz="0" iyy="0.00001" iyz="0" izz="0.00001"/></inertial>
 </link>
 <joint name="joint_antena" type="fixed">
   <parent link="base_link"/>
@@ -188,5 +182,21 @@
 
   
 
+
+
+  <!-- Ground truth: pose REAL del robot leída del motor de física (no de las ruedas).
+       Solo para medir el error de cierre y los tiempos por vuelta (detector_vueltas.py);
+       ningún controlador la usa. Se publica en /ground_truth; su TF va a un tópico aparte
+       para no chocar con el TF odom -> base_footprint del DiffDrive. -->
+  <gazebo>
+    <plugin filename="gz-sim-odometry-publisher-system" name="gz::sim::systems::OdometryPublisher">
+      <odom_frame>world</odom_frame>
+      <robot_base_frame>base_footprint</robot_base_frame>
+      <odom_topic>ground_truth</odom_topic>
+      <tf_topic>ground_truth/tf</tf_topic>
+      <odom_publish_frequency>50</odom_publish_frequency>
+      <dimensions>3</dimensions>  <!-- 3D: la pista_pro tiene puente -->
+    </plugin>
+  </gazebo>
 
 </robot>

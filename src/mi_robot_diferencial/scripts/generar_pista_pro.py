@@ -246,6 +246,10 @@ print(f"""<?xml version="1.0"?>
     <physics name="1ms" type="ignored">
       <max_step_size>0.001</max_step_size>
       <real_time_factor>1.0</real_time_factor>
+      <!-- Bullet en vez de ODE para detectar colisiones: ODE es inestable con mallas de
+           triángulos (STL de las pistas) y puede "lanzar" el robot al rozar un muro.
+           Si Bullet no está instalado, Gazebo avisa y vuelve a ODE. -->
+      <dart><collision_detector>bullet</collision_detector></dart>
     </physics>
     <plugin filename="gz-sim-physics-system" name="gz::sim::systems::Physics"/>
     <plugin filename="gz-sim-scene-broadcaster-system" name="gz::sim::systems::SceneBroadcaster"/>
