@@ -1,0 +1,24 @@
+Actualización v3 de la consola web
+==================================
+Pestañas: 1 Inicio (modo + guía) · 2 Calibración · 3 Operación (cámara de fondo, pedales
+translúcidos) · 4 Odometría · 5 Wall following (solo tuning). Manual/Autónomo sin relanzar.
+
+Archivos (se descomprimen encima del workspace):
+  src/mi_robot_diferencial/scripts/aeb_mux.py              modo teleop|auto en caliente
+  src/mi_robot_diferencial/scripts/wall_follow.py          parámetro `activo`
+  src/mi_robot_diferencial/scripts/volante_web.py          la consola
+  src/mi_robot_diferencial/launch/robot_yahboom.launch.py  wall_follow siempre (detenido en teleop)
+
+Instalar:
+  cd ~/ros2_ws_dif
+  git switch competencia-microros && git pull
+  git switch consola-v2 2>/dev/null || git switch -c consola-v2
+  unzip -o ~/Downloads/actualizacion_consola_v3.zip -d ~/ros2_ws_dif
+  chmod +x src/mi_robot_diferencial/scripts/*.py
+  rm -rf build install log
+  colcon build --packages-select mi_robot_diferencial && source install/setup.bash
+  ros2 launch mi_robot_diferencial robot_yahboom.launch.py pista:=competencia volante:=true
+
+Volver a lo anterior:
+  git checkout -- . && git switch competencia-microros && git branch -D consola-v2
+  rm -rf build install log && colcon build --packages-select mi_robot_diferencial && source install/setup.bash

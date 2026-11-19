@@ -54,7 +54,10 @@ Decisión (cada 1/rate s, aunque no lleguen comandos nuevos: el DiffDrive mantie
     Histéresis: estando activo, el umbral se multiplica por `histeresis` para soltar.
 
 Mux:
-    `modo` = teleop | auto elige la fuente (la otra se ignora).
+    `modo` = teleop | auto elige la fuente (la otra se ignora). Se puede cambiar EN CALIENTE:
+        ros2 param set /aeb_mux modo auto      (o desde la consola web, pestaña Wall following)
+    Al cambiar se descarta el último comando de la nueva fuente: hace falta un mensaje nuevo
+    (el robot no arranca con una tecla vieja ni con un comando autónomo viejo).
     Si la fuente activa calla más de timeout_<modo> s manda cero. En teleop viene en 0
     (se mantiene el último comando: teleop_twist_keyboard solo publica al presionar teclas).
     Sin /scan reciente (timeout_scan) no se deja avanzar.
@@ -121,13 +124,16 @@ class AEBNode(Node):
         self.w_meas = 0.0      # velocidad angular medida (/odom)
         self.cmd = Twist()     # último comando de la fuente activa
         self.t_cmd = None
+        self.fuentes = {'teleop': (Twist(), None), 'auto': (Twist(), None)}   # (msg, t)
         self.activo = False
         self.bloqueado = None  # (v, ω) del comando que frenó el AEB (rearme)
 
         # %% Comunicación
         self.create_subscription(LaserScan, '/scan', self.scan_cb, qos_profile_sensor_data)
         self.create_subscription(Odometry, '/odom', self.odom_cb, qos_profile_sensor_data)
-        self.create_subscription(Twist, '/cmd_vel_' + self.modo, self.cmd_cb, 10)
+        for f in ('teleop', 'auto'):
+            self.create_subscription(Twist, '/cmd_vel_' + f, lambda m, f=f: self.cmd_cb(f, m), 10)
+        self.add_on_set_parameters_callback(self.cb_params)
         self.pub_cmd = self.create_publisher(Twist, '/cmd_vel', 10)
         self.pub_active = self.create_publisher(Bool, '/aeb/activo', 10)
         self.pub_ttc = self.create_publisher(Float64, '/aeb/ttc_min', 10)
@@ -172,8 +178,23 @@ class AEBNode(Node):
         self.v_meas = msg.twist.twist.linear.x
         self.w_meas = msg.twist.twist.angular.z
 
-    def cmd_cb(self, msg: Twist):
-        self.cmd, self.t_cmd = msg, self.ahora()
+    def cmd_cb(self, fuente: str, msg: Twist):
+        self.fuentes[fuente] = (msg, self.ahora())
+
+    def cb_params(self, params):
+        from rcl_interfaces.msg import SetParametersResult
+        for prm in params:
+            if prm.name == 'modo':
+                if prm.value not in ('teleop', 'auto'):
+                    return SetParametersResult(successful=False,
+                                               reason="modo debe ser 'teleop' o 'auto'")
+                if prm.value != self.modo:
+                    self.modo = prm.value
+                    self.fuentes[self.modo] = (Twist(), None)   # exigir un comando nuevo
+                    self.bloqueado = None
+                    self.get_logger().warn(f'Modo cambiado a {self.modo.upper()}: '
+                                           f'/cmd_vel_{self.modo} -> AEB -> /cmd_vel')
+        return SetParametersResult(successful=True)
 
     # ------------------------------------------------------------------ TTC
     def dist_corredor(self, v: float, w: float) -> np.ndarray:
@@ -227,6 +248,7 @@ class AEBNode(Node):
 
         # 1) Mux: último comando de la fuente activa (o cero si está vencido / no ha llegado)
         timeout = self.p('timeout_' + self.modo)
+        self.cmd, self.t_cmd = self.fuentes[self.modo]
         v_cmd = w_cmd = 0.0
         if self.t_cmd is not None and (timeout <= 0.0 or t - self.t_cmd <= timeout):
             v_cmd, w_cmd = self.cmd.linear.x, self.cmd.angular.z

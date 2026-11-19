@@ -8,8 +8,10 @@ Lanza la simulación con el robot y la pista que se elijan.
   ros2 launch mi_robot_diferencial robot_yahboom.launch.py modo:=auto          # obedece /cmd_vel_auto
   ros2 launch mi_robot_diferencial robot_yahboom.launch.py modo:=auto algoritmo:=ninguno   # auto sin controlador
                                                                                # (para publicar /cmd_vel_auto a mano)
-En modo auto se lanza también el algoritmo autónomo (por defecto wall_follow.py, que publica
-en /cmd_vel_auto y pasa por el AEB).
+El algoritmo autónomo (por defecto wall_follow.py, que publica en /cmd_vel_auto y pasa por el
+AEB) se lanza SIEMPRE: con modo:=auto arranca activo; con modo:=teleop arranca detenido
+(activo=false). Desde la consola web (volante:=true, pestaña Wall following) se cambia de
+manual a autónomo y de vuelta sin relanzar (cambia `modo` de /aeb_mux y `activo` de /wall_follow).
 
 Los comandos pasan siempre por aeb_mux.py (mux + frenado de emergencia) antes de llegar a /cmd_vel.
 Teleoperación, en otra terminal:
@@ -71,10 +73,12 @@ def lanzar(context):
         # El celular como volante -> /cmd_vel_teleop (pasa por el AEB igual que el teclado)
         nodos_extra.append(Node(package='mi_robot_diferencial', executable='volante_web.py',
                                output='screen'))
-    if modo == 'auto' and algoritmo != 'ninguno':
-        # Controlador autónomo reactivo: /scan -> /cmd_vel_auto (el AEB va detrás, en aeb_mux)
+    if algoritmo != 'ninguno':
+        # Controlador autónomo reactivo: /scan -> /cmd_vel_auto (el AEB va detrás, en aeb_mux).
+        # En teleop arranca detenido; se activa desde la consola o con ros2 param set.
         nodos_extra.append(Node(package='mi_robot_diferencial', executable=algoritmo + '.py',
-                               output='screen', parameters=[{'use_sim_time': True}]))
+                               output='screen', parameters=[{'use_sim_time': True,
+                                                             'activo': modo == 'auto'}]))
 
     return nodos_extra + [
         # Gazebo con la pista, arrancando sin pausa (-r)
@@ -127,7 +131,7 @@ def generate_launch_description():
                               description='true: lanza volante_web.py (el celular como volante)'),
         DeclareLaunchArgument('algoritmo', default_value='wall_follow',
                               choices=['wall_follow', 'ninguno'],
-                              description='Controlador autónomo que se lanza con modo:=auto'),
+                              description='Controlador autónomo (activo si modo:=auto; detenido si teleop)'),
         DeclareLaunchArgument('vueltas', default_value='3',
                               description='Vueltas tras las que detector_vueltas guarda resultados'),
         DeclareLaunchArgument('carpeta_salida', default_value='~/resultados_vueltas',

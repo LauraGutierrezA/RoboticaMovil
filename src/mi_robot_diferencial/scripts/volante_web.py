@@ -4,24 +4,27 @@ volante_web.py — Consola web en el celular: volante, odometría en vivo y tuni
 
     Celular (navegador, HTTPS)                         PC
     ┌───────────────────────────────┐                 ┌─────────────────────┐
-    │ 1 Calibración  (no mueve)      │  POST /cmd 20Hz │                     │ ─► /cmd_vel_teleop ─► aeb_mux
-    │ 2 Operación    (mueve)         │ ──────────────► │   volante_web.py    │
-    │ 3 Odometría    (gráficas)      │  GET /datos     │   (este nodo)       │ ◄─ /ground_truth /odom /odom_llantas
-    │ 4 Wall following (tuning)      │ ◄────────────── │                     │ ◄─ /wall/* /aeb/* /vuelta
+    │ 1 Inicio       (modo, guía)    │  POST /modo     │                     │ ─► `modo` de /aeb_mux, `activo` de /wall_follow
+    │ 2 Calibración  (no mueve)      │  POST /cmd 20Hz │                     │ ─► /cmd_vel_teleop ─► aeb_mux
+    │ 3 Operación    (cámara, mueve) │ ──────────────► │   volante_web.py    │ ◄─ /image_raw (GET /video, MJPEG)
+    │ 4 Odometría    (gráficas)      │  GET /datos     │   (este nodo)       │ ◄─ /ground_truth /odom /odom_llantas
+    │ 5 Wall following (tuning)      │ ◄────────────── │                     │ ◄─ /wall/* /aeb/* /vuelta
     └───────────────────────────────┘  POST /wall     └─────────────────────┘ ─► parámetros de /wall_follow
 
 Pestañas:
-  1. Calibración: el volante reacciona al celular pero NO publica nada. "Calibrar recto",
+  1. Inicio: selector de modo (Manual / Autónomo / Detener autónomo, sin relanzar: cambia `modo`
+     de /aeb_mux y `activo` de /wall_follow), estado general y guía de uso.
+  2. Calibración: el volante reacciona al celular pero NO publica nada. "Calibrar recto",
      sensibilidad (ángulo de giro que da ω máx), zona muerta e invertir. Se guardan en el celular.
-  2. Operación: solo aquí se publica en /cmd_vel_teleop (y solo mientras la pestaña está abierta y
-     llegan datos). Reversa / Adelante se mantienen presionados; el acelerador escala v.
-  3. Odometría: error de posición y de orientación de la odometría propia (/odom_llantas,
+  3. Operación: la cámara del robot (/image_raw, MJPEG) de fondo, con los pedales Reversa /
+     Adelante translúcidos encima. Solo aquí se publica en /cmd_vel_teleop (y solo mientras la
+     pestaña está abierta y llegan datos). Inclinar el celular gira.
+  4. Odometría: error de posición y de orientación de la odometría propia (/odom_llantas,
      ω_I y ω_D) y del DiffDrive (/odom) frente a la pose real (/ground_truth), en vivo, más la
      trayectoria. /odom arranca en (0,0,0): se lleva al marco del mundo con la pose real
      tomada la primera vez que el robot está quieto.
-  4. Wall following: cambia en caliente los parámetros de /wall_follow (cliente de parámetros,
-     igual que `ros2 param set`), arranca/detiene, y muestra e(t), D_t, vueltas y activaciones
-     del AEB. Solo tiene efecto con el launch en modo:=auto.
+  5. Wall following: parámetros de /wall_follow en caliente (cliente de parámetros, igual que
+     `ros2 param set`), e(t), D_t, vueltas y frenos del AEB.
 
 Ángulo del volante: θ = atan2(g_x, g_y) con la gravedad en el plano de la pantalla;
 giro = −(θ − θ_0) con θ_0 de "Calibrar recto". iOS invierte los ejes (suma 180°): lo absorbe
@@ -65,7 +68,18 @@ from rclpy.parameter_client import AsyncParameterClient
 from rclpy.qos import qos_profile_sensor_data
 from geometry_msgs.msg import Twist
 from nav_msgs.msg import Odometry
+from sensor_msgs.msg import Image
 from std_msgs.msg import Bool, Float64, Int32
+import numpy as np
+
+try:                                   # compresión JPEG para la cámara
+    import cv2
+except ImportError:                    # noqa: E722
+    cv2 = None
+try:
+    from PIL import Image as PILImage
+except ImportError:
+    PILImage = None
 
 
 # Parámetros de /wall_follow que se pueden tunear desde el celular: (nombre, tipo, paso, ayuda)
@@ -121,6 +135,9 @@ class NodoVolanteWeb(Node):
         dp('frecuencia', 20.0)           # [Hz]
         dp('muestreo_odom', 5.0)         # [Hz] puntos de la gráfica de odometría
         dp('carpeta_cert', '~/.volante_web')
+        dp('cam_topico', '/image_raw')
+        dp('cam_fps', 15.0)              # [Hz] tope de cuadros enviados al celular
+        dp('cam_calidad', 70)            # calidad JPEG (0-100)
         gp = lambda n: self.get_parameter(n).value  # noqa: E731
         self.v_max, self.w_max = gp('v_max'), gp('w_max')
         self.reversa_como_carro = gp('reversa_como_carro')
@@ -146,6 +163,12 @@ class NodoVolanteWeb(Node):
         self.aeb_activo, self.aeb_cuenta, self.ttc = False, 0, math.inf
         self.vueltas = []                         # (k, t_sim)
         self.modo = None                          # teleop | auto (parámetro de /aeb_mux)
+        self.wall_activo = None
+        # --- cámara
+        self.cam_cond = threading.Condition()
+        self.cam_msg, self.cam_n = None, 0
+        self.cam_fps, self.cam_q = gp('cam_fps'), int(gp('cam_calidad'))
+        self.cam_clientes = 0
 
         self.pub = self.create_publisher(Twist, gp('topico'), 10)
         sd = qos_profile_sensor_data
@@ -155,12 +178,13 @@ class NodoVolanteWeb(Node):
         self.create_subscription(Bool, '/aeb/activo', self.cb_aeb, 10)
         self.create_subscription(Float64, '/aeb/ttc_min', self.cb_ttc, 10)
         self.create_subscription(Int32, '/vuelta', self.cb_vuelta, 10)
+        self.create_subscription(Image, gp('cam_topico'), self.cb_cam, sd)
         for n in ('error', 'dist', 'd_obj'):
             self.create_subscription(Float64, f'/wall/{n}', lambda m, n=n: self.cb_wall(n, m), 10)
         self.pc_wall = AsyncParameterClient(self, 'wall_follow')
         self.pc_mux = AsyncParameterClient(self, 'aeb_mux')
         self.create_timer(1.0 / gp('frecuencia'), self.cb_timer)
-        self.create_timer(2.0, self.consultar_modo)
+        self.create_timer(1.0, self.consultar_modo)
 
         cert, key = self.certificado(os.path.expanduser(gp('carpeta_cert')))
         self.servidor = ThreadingHTTPServer(('0.0.0.0', gp('puerto')), self.handler())
@@ -303,16 +327,76 @@ class NodoVolanteWeb(Node):
             self.vueltas.append((m.data, round(t, 2)))
 
     def consultar_modo(self):
-        if self.modo is not None or not self.pc_mux.services_are_ready():
-            return
-        fut = self.pc_mux.get_parameters(['modo'])
+        # el modo puede cambiar desde aquí o con ros2 param set: se consulta cada segundo
+        if self.pc_mux.services_are_ready():
+            def listo_mux(f):
+                try:
+                    self.modo = parameter_value_to_python(f.result().values[0])
+                except Exception:  # noqa: BLE001
+                    pass
+            self.pc_mux.get_parameters(['modo']).add_done_callback(listo_mux)
+        if self.pc_wall.services_are_ready():
+            def listo_wall(f):
+                try:
+                    self.wall_activo = parameter_value_to_python(f.result().values[0])
+                except Exception:  # noqa: BLE001
+                    pass
+            self.pc_wall.get_parameters(['activo']).add_done_callback(listo_wall)
+        else:
+            self.wall_activo = None
 
-        def listo(f):
-            try:
-                self.modo = parameter_value_to_python(f.result().values[0])
-            except Exception:  # noqa: BLE001
-                pass
-        fut.add_done_callback(listo)
+    def cambiar_modo(self, modo):
+        """Manual <-> autónomo sin relanzar: `modo` de /aeb_mux y `activo` de /wall_follow."""
+        if modo not in ('teleop', 'auto'):
+            raise ValueError("modo debe ser 'teleop' o 'auto'")
+        if not self.pc_mux.services_are_ready():
+            raise RuntimeError('/aeb_mux no responde')
+        if modo == 'auto':
+            # primero el mux (el robot queda en cero hasta que wall_follow publique), luego activar
+            self.esperar(self.pc_mux.set_parameters([Parameter('modo', value='auto')]))
+            self.wall_escribir({'activo': True})
+        else:
+            # primero detener el wall_follow, luego devolver el mux al teclado/volante
+            if self.pc_wall.services_are_ready():
+                self.wall_escribir({'activo': False})
+            self.esperar(self.pc_mux.set_parameters([Parameter('modo', value='teleop')]))
+        self.modo = modo
+        self.wall_activo = modo == 'auto'
+        self.get_logger().warn(f'Modo cambiado desde la consola: {modo.upper()}')
+
+    # ================================================================ cámara
+    def cb_cam(self, m):
+        if self.cam_clientes <= 0:
+            return                               # nadie mirando: no guardar
+        with self.cam_cond:
+            self.cam_msg, self.cam_n = m, self.cam_n + 1
+            self.cam_cond.notify_all()
+
+    def jpeg(self, m):
+        ch = {'rgb8': 3, 'bgr8': 3, 'rgba8': 4, 'bgra8': 4, 'mono8': 1}.get(m.encoding)
+        if ch is None:
+            raise ValueError(f'encoding no soportado: {m.encoding}')
+        buf = np.frombuffer(m.data, dtype=np.uint8).reshape(m.height, m.step)[:, :m.width * ch]
+        img = buf.reshape(m.height, m.width, ch) if ch > 1 else buf.reshape(m.height, m.width)
+        if cv2 is not None:
+            if m.encoding == 'rgb8':
+                img = img[:, :, ::-1]
+            elif m.encoding == 'rgba8':
+                img = cv2.cvtColor(img, cv2.COLOR_RGBA2BGR)
+            elif m.encoding == 'bgra8':
+                img = cv2.cvtColor(img, cv2.COLOR_BGRA2BGR)
+            ok, j = cv2.imencode('.jpg', np.ascontiguousarray(img), [cv2.IMWRITE_JPEG_QUALITY, self.cam_q])
+            return j.tobytes()
+        if PILImage is not None:
+            import io
+            if m.encoding in ('bgr8', 'bgra8'):
+                img = img[:, :, 2::-1]
+            elif ch == 4:
+                img = img[:, :, :3]
+            out = io.BytesIO()
+            PILImage.fromarray(np.ascontiguousarray(img)).save(out, 'JPEG', quality=self.cam_q)
+            return out.getvalue()
+        raise RuntimeError('no hay OpenCV ni Pillow: sudo apt install python3-opencv')
 
     def esperar(self, fut, timeout=2.0):
         ev = threading.Event()
@@ -355,7 +439,7 @@ class NodoVolanteWeb(Node):
         def num(x):  # noqa: E306
             return None if x is None or not math.isfinite(x) else round(x, 3)
         return dict(
-            modo=self.modo, publicando=self.publicando,
+            modo=self.modo, publicando=self.publicando, wall_activo=self.wall_activo,
             cmd=[round(self.cmd_out[0], 2), round(self.cmd_out[1], 2)],
             v_odom=round(self.v_odom, 2), dist=round(self.dist, 2),
             aeb=self.aeb_activo, aeb_cuenta=self.aeb_cuenta, ttc=num(self.ttc),
@@ -402,6 +486,8 @@ class NodoVolanteWeb(Node):
                     elif u.path == '/datos':
                         self.responder(200, nodo.datos(int(q.get('odom', ['0'])[0]),
                                                        int(q.get('wall', ['0'])[0])))
+                    elif u.path == '/video':
+                        self.video()
                     elif u.path == '/wall':
                         self.responder(200, dict(ok=True, valores=nodo.wall_leer(),
                                                  grupos=[[g, [[n, s, a] for n, _, s, a in ps]]
@@ -423,6 +509,9 @@ class NodoVolanteWeb(Node):
                     elif self.path == '/wall':
                         nodo.wall_escribir(self.cuerpo())
                         self.responder(200, dict(ok=True))
+                    elif self.path == '/modo':
+                        nodo.cambiar_modo(self.cuerpo().get('modo'))
+                        self.responder(200, dict(ok=True))
                     elif self.path == '/reiniciar':
                         nodo.reiniciar_graficas()
                         self.responder(200, dict(ok=True))
@@ -430,6 +519,39 @@ class NodoVolanteWeb(Node):
                         self.responder(404, b'', 'text/plain')
                 except Exception as e:  # noqa: BLE001
                     self.responder(200, dict(ok=False, error=str(e)))
+
+            def video(self):
+                """MJPEG: un JPEG por cuadro nuevo de la cámara, hasta que el celular cierre."""
+                if cv2 is None and PILImage is None:
+                    self.responder(503, b'sin OpenCV ni Pillow', 'text/plain')
+                    return
+                self.close_connection = True
+                self.send_response(200)
+                self.send_header('Content-Type', 'multipart/x-mixed-replace; boundary=cuadro')
+                self.send_header('Cache-Control', 'no-store')
+                self.send_header('Connection', 'close')
+                self.end_headers()
+                nodo.cam_clientes += 1
+                visto, t_ult = -1, 0.0
+                try:
+                    while True:
+                        with nodo.cam_cond:
+                            nodo.cam_cond.wait_for(lambda: nodo.cam_n != visto, timeout=2.0)
+                            m, visto = nodo.cam_msg, nodo.cam_n
+                        if m is None:
+                            continue
+                        espera = 1.0 / nodo.cam_fps - (time.monotonic() - t_ult)
+                        if espera > 0:
+                            time.sleep(espera)
+                        t_ult = time.monotonic()
+                        j = nodo.jpeg(m)
+                        self.wfile.write(b'--cuadro\r\nContent-Type: image/jpeg\r\nContent-Length: '
+                                         + str(len(j)).encode() + b'\r\n\r\n' + j + b'\r\n')
+                        self.wfile.flush()
+                except (BrokenPipeError, ConnectionResetError, ssl.SSLError, OSError):
+                    pass
+                finally:
+                    nodo.cam_clientes -= 1
 
             def log_message(self, *a):
                 pass
@@ -528,21 +650,58 @@ input[type=range]::-moz-range-thumb{width:22px;height:22px;border-radius:50%;bac
 .fila2{display:flex;gap:10px}
 .nota{font-size:.78rem;color:var(--mut)}
 
-/* ---------- 2 Operación ---------- */
-#v-op{grid-template-columns:1fr 1.25fr 1fr;gap:12px;touch-action:none;-webkit-user-select:none;user-select:none}
-.pedal{border-radius:18px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;
-  -webkit-user-select:none;user-select:none;-webkit-touch-callout:none;touch-action:none;transition:all .08s}
-.pedal .flecha{font-size:2.2rem;line-height:1;opacity:.85}
-.pedal .t{font-size:clamp(1.4rem,4vw,2.3rem);font-weight:800;letter-spacing:-.01em}
-.pedal .s{font:600 .68rem var(--mono);letter-spacing:.22em;color:var(--mut)}
-#rev{background:#160c1e;border:1.5px solid #e0465c99}
-#fwd{background:#0a1236;border:1.5px solid #2f6ff0aa}
-#rev.on{background:#3a1022;box-shadow:inset 0 0 40px #e0465c55,0 0 24px #e0465c44;transform:scale(.985)}
-#fwd.on{background:#0f2366;box-shadow:inset 0 0 40px #2f8ff055,0 0 24px #2f8ff044;transform:scale(.985)}
-#op-c{display:flex;flex-direction:column;align-items:center;gap:8px;min-height:0}
-#op-c .w{flex:1;min-height:0;width:100%;display:flex;align-items:center;justify-content:center;overflow:hidden}
-#op-c .abajo{width:100%;display:flex;gap:10px;align-items:flex-end}
-#op-c .abajo .slider{flex:1}
+/* ---------- Operación: cámara de fondo + controles translúcidos ---------- */
+#v-op{position:relative;background:#000;border-radius:16px;overflow:hidden;touch-action:none;
+  -webkit-user-select:none;user-select:none}
+#cam-img{position:absolute;inset:0;width:100%;height:100%;object-fit:contain;pointer-events:none}
+#v-op.llenar #cam-img{object-fit:cover}
+#op-hud{cursor:pointer}
+#cam-nada{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:var(--mut);
+  font:.85rem var(--mono);pointer-events:none;text-align:center;padding:0 30%}
+.pedal{position:absolute;top:10px;bottom:10px;width:24%;border-radius:20px;display:flex;flex-direction:column;
+  align-items:center;justify-content:center;gap:8px;-webkit-user-select:none;user-select:none;
+  -webkit-touch-callout:none;touch-action:none;transition:background .08s,border-color .08s;
+  background:rgba(255,255,255,.035);border:1px solid rgba(255,255,255,.10);color:rgba(255,255,255,.38)}
+#rev{left:10px}#fwd{right:10px}
+.pedal .flecha{font-size:2rem;line-height:1}
+.pedal .t{font-size:clamp(1.1rem,3.2vw,1.8rem);font-weight:800}
+.pedal .s{font:600 .6rem var(--mono);letter-spacing:.22em;opacity:.7}
+#rev.on{background:rgba(224,70,92,.22);border-color:rgba(224,70,92,.7);color:#fff}
+#fwd.on{background:rgba(47,143,240,.22);border-color:rgba(47,143,240,.7);color:#fff}
+.vidrio{background:rgba(5,8,26,.45);border:1px solid rgba(255,255,255,.12);border-radius:12px;
+  backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px)}
+#op-hud{position:absolute;top:10px;left:50%;transform:translateX(-50%);display:flex;gap:12px;align-items:center;
+  padding:6px 12px;font:600 .75rem var(--mono);white-space:nowrap}
+#op-giro{position:absolute;bottom:58px;left:50%;transform:translateX(-50%);width:38%;height:8px;border-radius:4px;
+  background:rgba(255,255,255,.12);overflow:hidden}
+#op-giro i{position:absolute;top:0;bottom:0;left:50%;background:var(--cian);opacity:.8}
+#op-giro:after{content:'';position:absolute;left:50%;top:0;bottom:0;width:2px;background:#fff8}
+#op-abajo{position:absolute;bottom:10px;left:50%;transform:translateX(-50%);width:44%;display:flex;gap:10px;
+  align-items:center;padding:6px 10px}
+#op-abajo .slider{flex:1}
+#op-abajo .btn{background:transparent;padding:6px 10px;font-size:.78rem}
+#op-aviso{position:absolute;top:52px;left:50%;transform:translateX(-50%);display:none;align-items:center;gap:10px;
+  white-space:nowrap;background:rgba(40,28,6,.8)}
+
+/* ---------- Inicio ---------- */
+#v-ini{grid-template-columns:minmax(0,1fr) minmax(0,1.15fr);gap:10px;overflow:auto;align-content:start}
+#ini-modo{padding:14px;display:flex;flex-direction:column;gap:12px}
+#ini-estado{font:800 1.5rem var(--mono)}
+.modos{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.modo-b{border-radius:14px;padding:12px;text-align:left;border:1px solid var(--line);background:var(--panel2);display:flex;flex-direction:column;gap:4px}
+.modo-b b{font-size:1.05rem}.modo-b span{font-size:.72rem;color:var(--mut)}
+.modo-b.sel{border-color:var(--cian);box-shadow:0 0 0 1px var(--cian) inset}
+.modo-b.auto b{color:var(--verde)}.modo-b.stop b{color:var(--rojo)}.modo-b.man b{color:var(--cian)}
+.estados{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.estados div{background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:7px 9px;display:flex;flex-direction:column;gap:2px}
+.estados b{font:700 .9rem var(--mono)}
+#ini-guia{padding:14px;display:flex;flex-direction:column;gap:9px;font-size:.82rem;line-height:1.35}
+#ini-guia h3{margin:0;font-size:.95rem}
+.paso{display:grid;grid-template-columns:26px 1fr;gap:8px;align-items:start}
+.paso i{font:700 .75rem var(--mono);font-style:normal;width:22px;height:22px;border-radius:7px;background:var(--panel2);
+  border:1px solid var(--line);display:flex;align-items:center;justify-content:center;color:var(--cian)}
+.paso p{margin:0;color:#c6cbe6}.paso b{color:var(--txt)}
+.seg{border-top:1px solid var(--line);padding-top:8px;color:var(--mut);font-size:.76rem}
 
 /* ---------- 3 Odometría y 4 Wall ---------- */
 #v-odo,#v-wall{overflow:auto;gap:10px;align-content:start}
@@ -573,6 +732,9 @@ input[type=range]::-moz-range-thumb{width:22px;height:22px;border-radius:50%;bac
 #vueltas div{display:flex;justify-content:space-between}
 #msg{font:.75rem var(--mono);min-height:1.2em}
 
+#modo-estado{font:700 .8rem var(--mono);letter-spacing:.06em}
+.btn.grande{font-size:1rem;padding:12px 18px}
+
 /* ---------- inicio ---------- */
 #inicio{position:fixed;inset:0;background:radial-gradient(circle at 50% 40%,#0d1a55,#05081a 70%);display:flex;
   flex-direction:column;align-items:center;justify-content:center;gap:18px;text-align:center;padding:24px;z-index:9}
@@ -585,18 +747,51 @@ input[type=range]::-moz-range-thumb{width:22px;height:22px;border-radius:50%;bac
   <div id="top">
     <div id="estado"><i></i><span>SIN CONEXIÓN</span></div>
     <div id="tabs">
-      <button data-v="cal" class="on"><b>1</b>Calibración</button>
-      <button data-v="op"><b>2</b>Operación</button>
-      <button data-v="odo"><b>3</b>Odometría</button>
-      <button data-v="wall"><b>4</b>Wall following</button>
+      <button data-v="ini" class="on"><b>1</b>Inicio</button>
+      <button data-v="cal"><b>2</b>Calibración</button>
+      <button data-v="op"><b>3</b>Operación</button>
+      <button data-v="odo"><b>4</b>Odometría</button>
+      <button data-v="wall"><b>5</b>Wall following</button>
     </div>
     <span id="aebchip">AEB</span>
     <span id="modo">—</span>
     <div id="vw">v 0.00 · ω 0.00</div>
   </div>
 
-  <!-- 1 CALIBRACIÓN -->
-  <section class="vista on" id="v-cal">
+  <!-- 1 INICIO -->
+  <section class="vista on" id="v-ini">
+    <div class="card" id="ini-modo">
+      <div class="lbl">Modo del robot</div>
+      <div id="ini-estado">—</div>
+      <div class="modos">
+        <button class="modo-b man" data-modo="teleop"><b>🎮 Manual</b><span>Teclado o el celular (pestaña Operación). El wall_follow queda detenido.</span></button>
+        <button class="modo-b auto" data-modo="auto"><b>▶ Autónomo</b><span>El wall_follow maneja solo. Pide confirmación: el robot arranca.</span></button>
+        <button class="modo-b stop" id="ini-stop"><b>■ Detener autónomo</b><span>Para el wall_follow sin salir de modo autónomo.</span></button>
+        <button class="modo-b" id="ini-reset"><b>↺ Reiniciar contadores</b><span>Borra gráficas, frenos del AEB y tiempos.</span></button>
+      </div>
+      <div class="estados">
+        <div><span class="lbl">Conexión</span><b id="e-con">—</b></div>
+        <div><span class="lbl">AEB</span><b id="e-aeb">—</b></div>
+        <div><span class="lbl">v real</span><b id="e-v">—</b></div>
+        <div><span class="lbl">wall_follow</span><b id="e-wall">—</b></div>
+        <div><span class="lbl">Vueltas</span><b id="e-vue">—</b></div>
+        <div><span class="lbl">Frenos AEB</span><b id="e-fre">—</b></div>
+      </div>
+      <div id="msg-ini" style="font:.75rem var(--mono);min-height:1.2em"></div>
+    </div>
+    <div class="card" id="ini-guia">
+      <h3>Cómo funciona</h3>
+      <div class="paso"><i>1</i><p><b>Inicio</b> (aquí): eliges el modo. Todo lo que mueve el robot pasa primero por el <b>AEB</b>, que frena si va a chocar, en cualquier modo.</p></div>
+      <div class="paso"><i>2</i><p><b>Calibración</b>: sostén el celular horizontal como un volante y toca <b>Calibrar recto</b>. Ajusta la <b>sensibilidad</b> (cuánto giras para el giro máximo). Aquí el robot <b>no</b> se mueve.</p></div>
+      <div class="paso"><i>3</i><p><b>Operación</b> (modo Manual): ves la <b>cámara del robot</b>. Mantén <b>Adelante</b> o <b>Reversa</b> e inclina el celular para girar. Al soltar, el robot frena.</p></div>
+      <div class="paso"><i>4</i><p><b>Odometría</b>: error en vivo de la odometría propia (ω_I, ω_D) y del DiffDrive frente a la pose real de Gazebo.</p></div>
+      <div class="paso"><i>5</i><p><b>Wall following</b>: cambia las ganancias y velocidades del controlador mientras corre, y mira e(t), los tiempos por vuelta y los frenos del AEB.</p></div>
+      <div class="seg">Seguridad: el robot solo obedece al celular en la pestaña Operación. Si cambias de pestaña, bloqueas la pantalla o se cae el WiFi, se detiene. Al cambiar de modo se descarta el último comando.</div>
+    </div>
+  </section>
+
+  <!-- 2 CALIBRACIÓN -->
+  <section class="vista" id="v-cal">
     <div class="card izq"><svg class="volante" data-vol viewBox="0 0 200 200"></svg></div>
     <div class="card der">
       <div><div class="lbl">Ángulo del celular</div><div class="big" id="cal-ang">+0°</div></div>
@@ -614,20 +809,23 @@ input[type=range]::-moz-range-thumb{width:22px;height:22px;border-radius:50%;bac
 
   <!-- 2 OPERACIÓN -->
   <section class="vista" id="v-op">
+    <img id="cam-img" alt="">
+    <div id="cam-nada">Esperando la cámara (/image_raw)…</div>
     <div class="pedal" id="rev"><div class="flecha">‹</div><div class="t">Reversa</div><div class="s">MANTENER</div></div>
-    <div id="op-c">
-      <div class="aviso" id="op-aviso" style="display:none"></div>
-      <div class="w"><svg class="volante" data-vol viewBox="0 0 200 200"></svg></div>
-      <div class="abajo">
-        <button class="btn" id="cal2">Calibrar</button>
-        <div class="slider"><div class="fila"><span class="lbl">Acel</span><span class="val" id="acel-v"></span></div>
-          <input type="range" id="acel" min="0.1" max="1" step="0.05" value="0.6"></div>
-      </div>
-    </div>
     <div class="pedal" id="fwd"><div class="flecha">›</div><div class="t">Adelante</div><div class="s">MANTENER</div></div>
+    <div id="op-hud" class="vidrio"><span id="op-vw">v 0.00 · ω 0.00</span><span id="op-ang">+0°</span>
+      <span id="cam-aeb" style="color:var(--rojo);display:none">● AEB</span><span style="opacity:.6">⤢</span></div>
+    <div id="op-aviso" class="aviso"><span>Modo AUTÓNOMO: el celular no mueve el robot.</span>
+      <button class="btn" data-modo="teleop">Volver a manual</button></div>
+    <div id="op-giro"><i></i></div>
+    <div id="op-abajo" class="vidrio">
+      <button class="btn" id="cal2">Calibrar</button>
+      <div class="slider"><div class="fila"><span class="lbl">Acel</span><span class="val" id="acel-v"></span></div>
+        <input type="range" id="acel" min="0.1" max="1" step="0.05" value="0.6"></div>
+    </div>
   </section>
 
-  <!-- 3 ODOMETRÍA -->
+  <!-- 4 ODOMETRÍA -->
   <section class="vista" id="v-odo">
     <div class="card kpi"><span class="lbl">Distancia real</span><span class="n" id="k-dist">0.00</span><span class="u">m</span></div>
     <div class="card kpi"><span class="lbl">Error propia</span><span class="n" id="k-el" style="color:var(--rojo)">—</span><span class="u">mm (ω_I, ω_D)</span></div>
@@ -645,16 +843,15 @@ input[type=range]::-moz-range-thumb{width:22px;height:22px;border-radius:50%;bac
       <button class="btn" id="reset-odo">Reiniciar gráficas</button></div>
   </section>
 
-  <!-- 4 WALL FOLLOWING -->
+  <!-- 5 WALL FOLLOWING -->
   <section class="vista" id="v-wall">
     <div class="card" id="params"><div class="nota" id="params-nota">Cargando parámetros de /wall_follow…</div></div>
     <div id="wall-der">
       <div class="aviso" id="wall-aviso" style="display:none"></div>
       <div class="card" style="padding:12px;display:flex;flex-direction:column;gap:10px">
-        <div class="botones">
-          <button class="btn ok" id="w-go">▶ Arrancar</button><button class="btn mal" id="w-stop">■ Detener</button>
-          <button class="btn pri" id="w-apl">Aplicar cambios</button>
-        </div>
+        <div><span class="lbl">Estado </span><span id="modo-estado">—</span>
+          <span class="nota"> · el modo se elige en Inicio</span></div>
+        <div class="botones"><button class="btn pri" id="w-apl">Aplicar cambios</button></div>
         <div class="botones">
           <span class="lbl" style="align-self:center">Presets</span>
           <button class="btn" data-pre="seguro">Seguro</button><button class="btn" data-pre="rapido">Rápido</button>
@@ -687,7 +884,7 @@ const $ = id => document.getElementById(id);
 const store = { get(k, d){ try { const v = localStorage.getItem('vol_'+k); return v===null ? d : JSON.parse(v); } catch(_) { return d; } },
                 set(k, v){ try { localStorage.setItem('vol_'+k, JSON.stringify(v)); } catch(_){} } };
 let theta = null, theta0 = store.get('theta0', 0), signo = store.get('signo', 1), giro = 0;
-let adelante = false, reversa = false, vista = 'cal';
+let adelante = false, reversa = false, vista = 'ini';
 let sens = store.get('sens', 45), zm = store.get('zm', 4);
 const W_MAX = 4.0;
 
@@ -720,6 +917,9 @@ function pintarVolante(){
   const b = $('barra').firstElementChild;
   b.style.width = f + '%'; b.style.left = (w > 0 ? 50 - f : 50) + '%';
   $('cal-w').textContent = w.toFixed(2) + ' rad/s';
+  const og = $('op-giro').firstElementChild;                  // barra de giro sobre la cámara
+  og.style.width = f + '%'; og.style.left = (w > 0 ? 50 - f : 50) + '%';
+  $('op-ang').textContent = (giro>=0?'+':'') + giro.toFixed(0) + '°';
 }
 function onMotion(e){
   const g = e.accelerationIncludingGravity;
@@ -751,6 +951,9 @@ function irA(v){
   document.querySelectorAll('#tabs button').forEach(b => b.classList.toggle('on', b.dataset.v === v));
   document.querySelectorAll('.vista').forEach(s => s.classList.toggle('on', s.id === 'v-' + v));
   if (v === 'wall') cargarParams();
+  const img = $('cam-img');
+  if (v === 'op'){ img.src = '/video?' + Date.now(); }         // la cámara solo se transmite en Operación
+  else if (img.getAttribute('src')){ img.removeAttribute('src'); $('cam-nada').style.display = 'flex'; }
   if (v === 'odo' || v === 'wall') requestAnimationFrame(dibujarTodo);
 }
 document.querySelectorAll('#tabs button').forEach(b => b.onclick = () => irA(b.dataset.v));
@@ -772,6 +975,7 @@ let enVuelo = false, conectado = false;
 function estado(ok){
   conectado = ok; $('estado').classList.toggle('ok', ok);
   $('estado').lastElementChild.textContent = ok ? 'CONECTADO' : 'SIN CONEXIÓN';
+  if (!ok){ $('e-con').textContent = 'SIN CONEXIÓN'; $('e-con').style.color = css('--rojo'); }
 }
 async function enviar(){
   if (enVuelo) return; enVuelo = true;
@@ -780,7 +984,8 @@ async function enviar(){
       body: JSON.stringify({giro, adelante, reversa, acelerador:+$('acel').value, sensibilidad:sens, zona_muerta:zm,
                             operar: vista === 'op' && !document.hidden})});
     const c = await r.json(); estado(true);
-    if (vista === 'op') $('vw').textContent = `v ${c.v.toFixed(2)} · ω ${c.w.toFixed(2)}`;
+    if (vista === 'op'){ $('vw').textContent = `v ${c.v.toFixed(2)} · ω ${c.w.toFixed(2)}`;
+                         $('op-vw').textContent = `v ${c.v.toFixed(2)} · ω ${c.w.toFixed(2)}`; }
   } catch(_) { estado(false); }
   enVuelo = false;
 }
@@ -830,12 +1035,26 @@ function actualizar(d){
   const m = $('modo'); m.textContent = d.modo ? d.modo.toUpperCase() : '—'; m.className = d.modo || '';
   $('aebchip').style.display = d.aeb ? 'inline-block' : 'none';
   if (vista !== 'op') $('vw').textContent = `v ${d.v_odom.toFixed(2)} m/s`;
-  const ao = $('op-aviso');
-  ao.style.display = d.modo === 'auto' ? 'block' : 'none';
-  ao.textContent = 'El mux está en AUTO: el volante no mueve el robot. Relanza sin modo:=auto.';
+  $('op-aviso').style.display = d.modo === 'auto' ? 'flex' : 'none';
   const aw = $('wall-aviso');
   aw.style.display = d.wall_ok ? 'none' : 'block';
-  aw.textContent = d.modo === 'teleop' ? 'Modo TELEOP: wall_follow solo corre con modo:=auto.' : '/wall_follow no responde todavía.';
+  aw.textContent = '/wall_follow no responde (¿se lanzó con algoritmo:=ninguno?).';
+  const me = $('modo-estado');
+  if (d.modo === 'auto'){ me.textContent = d.wall_activo ? 'AUTÓNOMO · wall_follow corriendo' : 'AUTÓNOMO · detenido';
+                          me.style.color = d.wall_activo ? css('--verde') : css('--ambar'); }
+  else { me.textContent = d.modo === 'teleop' ? 'MANUAL (teclado / volante)' : '—'; me.style.color = css('--cian'); }
+  $('cam-aeb').style.display = d.aeb ? 'inline' : 'none';
+  // Inicio
+  const ie = $('ini-estado');
+  ie.textContent = d.modo === 'auto' ? (d.wall_activo ? 'AUTÓNOMO ▶' : 'AUTÓNOMO ■ detenido') : (d.modo === 'teleop' ? 'MANUAL 🎮' : 'esperando /aeb_mux…');
+  ie.style.color = d.modo === 'auto' ? (d.wall_activo ? css('--verde') : css('--ambar')) : css('--cian');
+  document.querySelectorAll('.modo-b[data-modo]').forEach(b => b.classList.toggle('sel', b.dataset.modo === d.modo));
+  $('e-con').textContent = 'OK'; $('e-con').style.color = css('--verde');
+  $('e-aeb').textContent = d.aeb ? 'FRENANDO' : 'libre'; $('e-aeb').style.color = d.aeb ? css('--rojo') : css('--txt');
+  $('e-v').textContent = d.v_odom.toFixed(2) + ' m/s';
+  $('e-wall').textContent = d.wall_activo === null ? 'no responde' : (d.wall_activo ? 'corriendo' : 'detenido');
+  $('e-vue').textContent = Math.max(0, (d.vueltas || []).length - 1);
+  $('e-fre').textContent = d.aeb_cuenta;
   // odometría
   const u = odom[odom.length-1];
   $('k-dist').textContent = d.dist.toFixed(2);
@@ -908,8 +1127,9 @@ $('w-apl').onclick = () => {
     if (isFinite(v) && Math.abs(v - actuales[p.dataset.n]) > 1e-9) c[p.dataset.n] = v; });
   Object.keys(c).length ? enviarWall(c) : msg('No hay cambios', true);
 };
-$('w-go').onclick = () => enviarWall({activo: true});
-$('w-stop').onclick = () => enviarWall({activo: false});
+$('ini-stop').onclick = async () => { await enviarWall({activo: false}); msgIni($('msg').textContent, true); pedirDatos(); };
+$('ini-reset').onclick = async () => { await reiniciar(); msgIni('Contadores y gráficas reiniciados', true); };
+function msgIni(t, ok){ $('msg-ini').textContent = t; $('msg-ini').style.color = ok ? css('--verde') : css('--rojo'); }
 document.querySelectorAll('[data-pre]').forEach(b => b.onclick = () => {
   const p = b.dataset.pre === 'inicial' ? inicial : PRESETS[b.dataset.pre]; if (!p) return;
   document.querySelectorAll('.prm').forEach(e => { const n = e.dataset.n; if (n in p){ e.querySelector('input').value = +(+p[n]).toFixed(3);
@@ -934,6 +1154,18 @@ async function empezar(){
   pintarVolante();
 }
 $('go').onclick = empezar;
+$('op-hud').onclick = () => { const o = $('v-op'); o.classList.toggle('llenar'); store.set('llenar', o.classList.contains('llenar')); };
+if (store.get('llenar', false)) $('v-op').classList.add('llenar');
+$('cam-img').addEventListener('load', () => { $('cam-nada').style.display = 'none'; });
+$('cam-img').addEventListener('error', () => { if (vista === 'op') $('cam-nada').textContent = 'Sin video (¿OpenCV instalado? ¿llega /image_raw?). Igual puedes manejar.'; });
+document.querySelectorAll('[data-modo]').forEach(b => b.onclick = async () => {
+  const modo = b.dataset.modo;
+  if (modo === 'auto' && !confirm('¿Pasar a modo AUTÓNOMO? El robot arranca solo con el wall_follow.')) return;
+  const d = await (await fetch('/modo', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({modo})})).json();
+  const t = d.ok ? (modo === 'auto' ? 'Modo AUTÓNOMO: wall_follow activo' : 'Modo MANUAL: wall_follow detenido') : d.error;
+  msg(t, d.ok); msgIni(t, d.ok);
+  pedirDatos(); if (vista === 'wall') cargarParams();
+});
 </script>
 </body></html>
 """
