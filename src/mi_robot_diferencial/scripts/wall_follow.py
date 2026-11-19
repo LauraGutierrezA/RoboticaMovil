@@ -118,6 +118,7 @@ class SeguidorPared:
 
 
 PARAMS = dict(
+    activo=True,           # False: publica cero (detener/arrancar en caliente, p. ej. desde el volante web)
     lado='izquierda',      # pared que se sigue: izquierda (interior, pista antihoraria) | derecha
     theta_deg=45.0,        # [°] separación entre los haces a y b
     vecinos=2,             # haces vecinos a cada lado que se promedian (5 en total)
@@ -166,12 +167,16 @@ class NodoWallFollow(Node):
             if prm.name in nuevos:
                 nuevos[prm.name] = prm.value
         self.seg.p = nuevos
-        if any(prm.name in ('kp', 'ki', 'kd') for prm in params):
+        if any(prm.name in ('kp', 'ki', 'kd', 'activo') for prm in params):
             self.seg.integral = 0.0
         return SetParametersResult(successful=True)
 
     def cb_scan(self, msg):
         t = msg.header.stamp.sec + msg.header.stamp.nanosec * 1e-9
+        if not self.seg.p['activo']:
+            self.pub.publish(Twist())           # detenido: cero, y el PID arranca limpio al volver
+            self.seg.reiniciar()
+            return
         v, w, info = self.seg.paso(msg.ranges, msg.angle_min, msg.angle_increment,
                                    msg.range_max, t)
         cmd = Twist()
